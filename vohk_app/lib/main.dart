@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
 import 'services/twilio_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
@@ -16,12 +17,11 @@ class VohkApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey, 
       title: 'Vohk Porteria',
       debugShowCheckedModeBanner: false,
-
       theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
-
-      home: const HomeScreen(),
+      home: const LoginScreen(),
     );
   }
 }
