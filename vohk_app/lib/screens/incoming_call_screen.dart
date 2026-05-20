@@ -3,6 +3,8 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../config.dart';
 import '../services/vohk_api.dart';
 import 'package:twilio_voice/twilio_voice.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
+import '../services/twilio_service.dart';
 
 class IncomingCallScreen extends StatefulWidget {
   const IncomingCallScreen({super.key});
@@ -18,11 +20,31 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   @override
   void initState() {
     super.initState();
+    WakelockPlus.enable();
     // First intercom camera
     final url = AppConfig.intercoms[0]['url']!;
     controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..loadRequest(Uri.parse(url));
+      ..loadRequest(Uri.parse(url)); // LISTEN FOR CALL EVENTS
+    TwilioVoice.instance.callEventsListener.listen((event) {
+      print('SCREEN EVENT: $event');
+
+      // CALL ENDED
+      if (event.toString().contains('callEnded') ||
+          event.toString().contains('disconnected')) {
+        TwilioService.callScreenOpen = false;
+
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    WakelockPlus.disable();
+    super.dispose();
   }
 
   Future<void> openDoor() async {

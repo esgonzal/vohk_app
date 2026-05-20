@@ -5,9 +5,11 @@ import 'package:http/http.dart' as http;
 import 'package:twilio_voice/twilio_voice.dart';
 import '../main.dart';
 import '../screens/incoming_call_screen.dart';
+import '../screens/home_screen.dart';
 import 'auth_service.dart';
 
 class TwilioService {
+  static bool callScreenOpen = false;
   static Future<void> initialize() async {
     // =========================
     // FIREBASE
@@ -56,17 +58,24 @@ class TwilioService {
     // =========================
     // EVENTS
     // =========================
-    TwilioVoice.instance.callEventsListener.listen((event) {
+    TwilioVoice.instance.callEventsListener.listen((event) async {
       print('========== TWILIO EVENT ==========');
       print(event);
       print(event.runtimeType);
       print('==================================');
       // When call becomes active,
       // open YOUR custom UI
-      if (event == CallEvent.connected) {
-        navigatorKey.currentState?.push(
+      // INCOMING CALL
+      if (event == CallEvent.ringing && !callScreenOpen) {
+        callScreenOpen = true;
+        navigatorKey.currentState?.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const IncomingCallScreen()),
+          (route) => route.isFirst, // keep home screen underneath
         );
+      }
+      if (event == CallEvent.callEnded || event == CallEvent.declined) {
+        callScreenOpen = false;
+        navigatorKey.currentState?.popUntil((route) => route.isFirst);
       }
     });
   }
