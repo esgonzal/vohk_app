@@ -19,15 +19,12 @@ class AuthService {
         }),
       );
       if (response.statusCode != 200) {
-        print('Login failed');
-        print(response.body);
+        print('Login Error: $response.body');
         return false;
       }
       final data = jsonDecode(response.body);
       username = data['username'];
       identity = data['identity'];
-      print('LOGIN SUCCESS');
-      print('identity: $identity');
       return true;
     } catch (e) {
       print('Login error: $e');

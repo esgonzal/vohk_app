@@ -1,36 +1,28 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
     <!-- INTERNET -->
     <uses-permission android:name="android.permission.INTERNET"/>
-
     <!-- AUDIO -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
-
     <!-- BLUETOOTH -->
     <uses-permission android:name="android.permission.BLUETOOTH"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
-
     <!-- NOTIFICATIONS -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
-
     <!-- TWILIO / PHONE -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
     <uses-permission android:name="android.permission.READ_PHONE_NUMBERS"/>
     <uses-permission android:name="android.permission.CALL_PHONE"/>
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS"/>
-
     <!-- FOREGROUND -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-
     <application
         android:name="${applicationName}"
         android:label="vohk_app"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
 
-        <!-- TWILIO FIREBASE SERVICE -->
+        <!-- TWILIO FIREBASE SERVICE  -->
         <service
             android:name="com.twilio.twilio_voice.fcm.VoiceFirebaseMessagingService"
             android:exported="false"
@@ -41,7 +33,7 @@
             </intent-filter>
 
         </service>
-
+       
         <!-- MAIN ACTIVITY -->
         <activity
             android:name=".MainActivity"

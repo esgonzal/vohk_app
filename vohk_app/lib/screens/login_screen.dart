@@ -22,12 +22,10 @@ class _LoginScreenState extends State<LoginScreen> {
       loading = true;
       error = null;
     });
-
     final success = await AuthService.login(
       usernameInput: usernameController.text.trim(),
       passwordInput: passwordController.text.trim(),
     );
-
     if (!success) {
       setState(() {
         loading = false;
@@ -35,11 +33,8 @@ class _LoginScreenState extends State<LoginScreen> {
       });
       return;
     }
-
     await TwilioService.initialize();
-
     if (!mounted) return;
-
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const HomeScreen()),
