@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:twilio_voice/twilio_voice.dart';
 import '../main.dart';
 import '../screens/incoming_call_screen.dart';
-import '../screens/home_screen.dart';
 import 'auth_service.dart';
 
 class TwilioService {
@@ -69,7 +68,10 @@ class TwilioService {
       if (event == CallEvent.ringing && !callScreenOpen) {
         callScreenOpen = true;
         navigatorKey.currentState?.pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const IncomingCallScreen()),
+          MaterialPageRoute(
+            builder: (_) =>
+                IncomingCallScreen(identity: AuthService.identity ?? ''),
+          ),
           (route) => route.isFirst, // keep home screen underneath
         );
       }

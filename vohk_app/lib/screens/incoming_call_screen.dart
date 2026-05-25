@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../config.dart';
 import '../services/vohk_api.dart';
 import 'package:twilio_voice/twilio_voice.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
-import '../services/twilio_service.dart';
 
 class IncomingCallScreen extends StatefulWidget {
-  const IncomingCallScreen({super.key});
+  final String identity;
+  const IncomingCallScreen({super.key, required this.identity});
 
   @override
   State<IncomingCallScreen> createState() => _IncomingCallScreenState();
@@ -21,24 +21,12 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   void initState() {
     super.initState();
     WakelockPlus.enable();
-    // First intercom camera
+    final identity = widget.identity;
+    debugPrint("Incoming call for identity: $identity");
     final url = AppConfig.intercoms[0]['url']!;
     controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..loadRequest(Uri.parse(url)); // LISTEN FOR CALL EVENTS
-    TwilioVoice.instance.callEventsListener.listen((event) {
-      print('SCREEN EVENT: $event');
-
-      // CALL ENDED
-      if (event.toString().contains('callEnded') ||
-          event.toString().contains('disconnected')) {
-        TwilioService.callScreenOpen = false;
-
-        if (mounted) {
-          Navigator.pop(context);
-        }
-      }
-    });
+      ..loadRequest(Uri.parse(url));
   }
 
   @override
@@ -48,14 +36,10 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   }
 
   Future<void> openDoor() async {
-    setState(() {
-      openingDoor = true;
-    });
+    setState(() => openingDoor = true);
     final success = await VohkApi.openDoor('main');
     if (!mounted) return;
-    setState(() {
-      openingDoor = false;
-    });
+    setState(() => openingDoor = false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(success ? 'Puerta abierta' : 'Error abriendo puerta'),
@@ -69,9 +53,6 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
 
   Future<void> hangUp() async {
     await TwilioVoice.instance.call.hangUp();
-    if (mounted) {
-      Navigator.pop(context);
-    }
   }
 
   @override
@@ -81,23 +62,23 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // LIVE VIDEO
             Expanded(child: WebViewWidget(controller: controller)),
-            // INFO
-            const Padding(
-              padding: EdgeInsets.all(16),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Text(
-                'Llamada entrante',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                'Llamada entrante: ${widget.identity}',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ),
-            // BUTTONS
             Padding(
               padding: const EdgeInsets.only(left: 24, right: 24, bottom: 32),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // ANSWER
                   ElevatedButton(
                     onPressed: answerCall,
                     style: ElevatedButton.styleFrom(
@@ -106,22 +87,14 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
                     ),
                     child: const Icon(Icons.call, size: 32),
                   ),
-                  // OPEN DOOR
                   ElevatedButton(
                     onPressed: openingDoor ? null : openDoor,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       padding: const EdgeInsets.all(18),
                     ),
-                    child: openingDoor
-                        ? const SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: CircularProgressIndicator(),
-                          )
-                        : const Icon(Icons.lock_open, size: 32),
+                    child: const Icon(Icons.lock_open, size: 32),
                   ),
-                  // HANG UP
                   ElevatedButton(
                     onPressed: hangUp,
                     style: ElevatedButton.styleFrom(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:vohk_app/screens/intercoms_screen.dart';
 import 'cameras_screen.dart';
 import 'doors_screen.dart';
@@ -14,38 +15,38 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool isRinging = false;
   bool inCall = false;
+  StreamSubscription? _twilioSub;
 
   @override
   void initState() {
     super.initState();
 
-    TwilioVoice.instance.callEventsListener.listen((event) {
-      print('TWILIO EVENT: $event');
-
+    _twilioSub = TwilioVoice.instance.callEventsListener.listen((event) {
       final text = event.toString().toLowerCase();
-
-      // incoming ringing
+      if (!mounted) return;
       if (text.contains('ringing')) {
         setState(() {
           isRinging = true;
           inCall = false;
         });
-      }
-      // connected
-      else if (text.contains('connected')) {
+      } else if (text.contains('connected')) {
         setState(() {
           isRinging = false;
           inCall = true;
         });
-      }
-      // ended / disconnected
-      else if (text.contains('disconnected') || text.contains('ended')) {
+      } else if (text.contains('disconnected') || text.contains('ended')) {
         setState(() {
           isRinging = false;
           inCall = false;
         });
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _twilioSub?.cancel(); // 🔥 critical
+    super.dispose();
   }
 
   void answerCall() async {
@@ -79,7 +80,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Vohk Porteria')),
-
       body: Column(
         children: [
           // ===== CALL UI =====
@@ -98,9 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     inCall ? 'Llamada activa' : 'Llamada entrante del portero',
                     style: const TextStyle(fontSize: 20, color: Colors.white),
                   ),
-
                   const SizedBox(height: 16),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -114,9 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             backgroundColor: Colors.green,
                           ),
                         ),
-
                       const SizedBox(width: 16),
-
                       // hangup button
                       ElevatedButton.icon(
                         onPressed: hangUp,
@@ -131,7 +127,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-
           // ===== MAIN GRID =====
           Expanded(
             child: Padding(
@@ -145,7 +140,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 itemBuilder: (context, index) {
                   final item = items[index];
-
                   return InkWell(
                     onTap: () {
                       if (item['screen'] != null) {
