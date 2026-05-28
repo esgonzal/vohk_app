@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:vohk_app/screens/intercoms_screen.dart';
 import 'cameras_screen.dart';
-import 'doors_screen.dart';
 import 'package:twilio_voice/twilio_voice.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -16,7 +15,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool isRinging = false;
   bool inCall = false;
   StreamSubscription? _twilioSub;
-
   @override
   void initState() {
     super.initState();
@@ -64,11 +62,6 @@ class _HomeScreenState extends State<HomeScreen> {
         'title': 'Camaras',
         'icon': Icons.videocam,
         'screen': const CamerasScreen(),
-      },
-      {
-        'title': 'Puertas',
-        'icon': Icons.lock_open,
-        'screen': const DoorsScreen(),
       },
       {
         'title': 'Intercom',

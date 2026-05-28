@@ -48,6 +48,8 @@ dependencies:
     path: local_plugins/twilio_voice
   flutter_local_notifications: ^17.2.1
   wakelock_plus: ^1.2.8
+  shared_preferences: ^2.5.3
+  flutter_webrtc: ^1.4.1
 
 dev_dependencies:
   flutter_test:
