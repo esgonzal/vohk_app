@@ -1,12 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:twilio_voice/twilio_voice.dart';
-import 'package:vohk_app/services/vohk_api.dart';
-import '../main.dart';
-import '../screens/incoming_call_screen.dart';
 import 'auth_service.dart';
 
 class TwilioService {
@@ -22,11 +18,11 @@ class TwilioService {
       final fcmToken = await FirebaseMessaging.instance.getToken();
       final identity = AuthService.identity;
       await http.post(
-        Uri.parse('https://api.vohk.cl/twilio/register-fcm'),
+        Uri.parse('https://api.vohk.cl/app/twilio/register-fcm'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'identity': identity, 'fcmToken': fcmToken}),
       );
-      final uri = Uri.parse('https://api.vohk.cl/twilio/token').replace(
+      final uri = Uri.parse('https://api.vohk.cl/app/twilio/token').replace(
         queryParameters: {'fcmToken': fcmToken ?? '', 'identity': identity},
       );
       final response = await http.get(uri);
@@ -44,21 +40,12 @@ class TwilioService {
       await _callSub?.cancel();
       _callSub = TwilioVoice.instance.callEventsListener.listen((event) async {
         if (event == CallEvent.ringing && !callScreenOpen) {
+          print("📞 Twilio ringing event");
+
           callScreenOpen = true;
-          final identity = AuthService.identity ?? '';
-          final streamUrl = await VohkApi.getStreamUrl(identity);
-          navigatorKey.currentState?.push(
-            MaterialPageRoute(
-              builder: (_) => IncomingCallScreen(
-                identity: identity,
-                streamUrl: streamUrl ?? '',
-              ),
-            ),
-          );
         }
         if (event == CallEvent.callEnded || event == CallEvent.declined) {
           callScreenOpen = false;
-          navigatorKey.currentState?.popUntil((route) => route.isFirst);
         }
       });
       _initialized = true;

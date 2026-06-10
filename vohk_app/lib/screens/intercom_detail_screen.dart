@@ -6,6 +6,7 @@ import '../widgets/live_camera_view.dart';
 class IntercomDetailScreen extends StatefulWidget {
   final dynamic intercom;
   const IntercomDetailScreen({super.key, required this.intercom});
+  
   @override
   State<IntercomDetailScreen> createState() => _IntercomDetailScreenState();
 }
@@ -13,6 +14,7 @@ class IntercomDetailScreen extends StatefulWidget {
 class _IntercomDetailScreenState extends State<IntercomDetailScreen> {
   bool loadingDoor = false;
   bool loadingCall = false;
+
   Future<void> openDoor() async {
     try {
       setState(() => loadingDoor = true);

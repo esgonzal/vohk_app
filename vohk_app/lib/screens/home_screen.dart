@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:vohk_app/screens/events_screen.dart';
 import 'dart:async';
 import 'package:vohk_app/screens/intercoms_screen.dart';
+import 'package:vohk_app/screens/invitations_screen.dart';
 import 'cameras_screen.dart';
 import 'package:twilio_voice/twilio_voice.dart';
+import 'package:vohk_app/screens/login_screen.dart';
+import 'package:vohk_app/services/auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,10 +19,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool isRinging = false;
   bool inCall = false;
   StreamSubscription? _twilioSub;
+
   @override
   void initState() {
     super.initState();
-
     _twilioSub = TwilioVoice.instance.callEventsListener.listen((event) {
       final text = event.toString().toLowerCase();
       if (!mounted) return;
@@ -47,6 +51,16 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  Future<void> logout() async {
+    await AuthService.logout();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
   void answerCall() async {
     await TwilioVoice.instance.call.answer();
   }
@@ -68,11 +82,38 @@ class _HomeScreenState extends State<HomeScreen> {
         'icon': Icons.call,
         'screen': const IntercomsScreen(),
       },
-      {'title': 'Eventos', 'icon': Icons.history, 'screen': null},
+      {
+        'title': 'Notificaciones',
+        'icon': Icons.history,
+        'screen': const EventsScreen(),
+      },
+      {
+        'title': 'Invitaciones',
+        'icon': Icons.contact_mail,
+        'screen': const InvitationsScreen(),
+      },
     ];
 
     return Scaffold(
       appBar: AppBar(title: const Text('Vohk Porteria')),
+      drawer: Drawer(
+        child: Column(
+          children: [
+            UserAccountsDrawerHeader(
+              accountName: Text(AuthService.username ?? 'Usuario'),
+              accountEmail: Text(AuthService.identity ?? ''),
+              currentAccountPicture: const CircleAvatar(
+                child: Icon(Icons.person),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Cerrar sesión'),
+              onTap: logout,
+            ),
+          ],
+        ),
+      ),
       body: Column(
         children: [
           // ===== CALL UI =====

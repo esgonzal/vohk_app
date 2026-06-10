@@ -12,7 +12,7 @@ class AuthService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('https://api.vohk.cl/twilio/login'),
+        Uri.parse('https://api.vohk.cl/app/twilio/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': usernameInput,

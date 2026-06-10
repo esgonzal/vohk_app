@@ -24,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
       usernameInput: usernameController.text.trim(),
       passwordInput: passwordController.text.trim(),
     );
+    print('Login success: $success');
     if (!success) {
       setState(() {
         loading = false;

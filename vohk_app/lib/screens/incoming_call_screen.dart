@@ -1,66 +1,45 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:twilio_voice/twilio_voice.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../services/vohk_api.dart';
+import '../widgets/live_camera_view.dart';
 
 class IncomingCallScreen extends StatefulWidget {
-  final String identity;
-  final String streamUrl;
-  const IncomingCallScreen({
-    super.key,
-    required this.identity,
-    required this.streamUrl,
-  });
+  final dynamic intercom;
+  const IncomingCallScreen({super.key, required this.intercom});
   @override
   State<IncomingCallScreen> createState() => _IncomingCallScreenState();
 }
 
 class _IncomingCallScreenState extends State<IncomingCallScreen>
     with WidgetsBindingObserver {
-  late final WebViewController controller;
   StreamSubscription? _callSubscription;
-  bool openingDoor = false;
-
+  bool loadingDoor = false;
+  bool answering = false;
+  bool hangingUp = false;
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WakelockPlus.enable();
     debugPrint("📞 Incoming call");
-    debugPrint("Identity: ${widget.identity}");
-    debugPrint("Stream: ${widget.streamUrl}");
-    final uri = Uri.tryParse(widget.streamUrl);
-    if (uri == null || !uri.hasScheme) {
-      debugPrint("❌ Invalid streamUrl");
-      return;
-    }
-    controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF000000))
-      ..loadRequest(uri);
+    debugPrint("Intercom: ${widget.intercom['name']}");
+    debugPrint("Stream: ${widget.intercom['streamUrl']}");
     _listenToCallEvents();
   }
 
   void _listenToCallEvents() {
     _callSubscription = TwilioVoice.instance.callEventsListener.listen((event) {
-      if (event == CallEvent.callEnded || event.toString().contains("Abort")) {
-        if (mounted) {
+      debugPrint("📞 Call event: $event");
+      if (event == CallEvent.callEnded ||
+          event == CallEvent.declined ||
+          event.toString().contains("Abort")) {
+        if (mounted && Navigator.of(context).canPop()) {
           Navigator.of(context).pop();
         }
       }
     });
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      controller.reload();
-    }
-    if (state == AppLifecycleState.paused) {
-      controller.clearCache();
-    }
   }
 
   @override
@@ -72,67 +51,133 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   }
 
   Future<void> openDoor() async {
-    setState(() => openingDoor = true);
-    final success = await VohkApi.openDoor('main');
-    if (!mounted) return;
-    setState(() => openingDoor = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(success ? 'Puerta abierta' : 'Error abriendo puerta'),
-      ),
-    );
+    try {
+      setState(() => loadingDoor = true);
+      final ok = await VohkApi.openDoor(widget.intercom['doorId'].toString());
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok ? 'Puerta abierta' : 'No se pudo abrir la puerta'),
+        ),
+      );
+    } catch (e) {
+      debugPrint('OPEN DOOR ERROR: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error abriendo puerta: $e')));
+    } finally {
+      if (mounted) {
+        setState(() => loadingDoor = false);
+      }
+    }
   }
 
   Future<void> answerCall() async {
-    debugPrint("📞 Answer pressed");
-    await TwilioVoice.instance.call.answer();
+    try {
+      setState(() => answering = true);
+      debugPrint("📞 Answer pressed");
+      await TwilioVoice.instance.call.answer();
+    } catch (e) {
+      debugPrint("ANSWER ERROR: $e");
+    } finally {
+      if (mounted) {
+        setState(() => answering = false);
+      }
+    }
   }
 
   Future<void> hangUp() async {
-    debugPrint("📞 Hang up pressed");
-    await TwilioVoice.instance.call.hangUp();
-    if (!mounted) return;
-    Navigator.of(context).pop();
+    try {
+      setState(() => hangingUp = true);
+      debugPrint("📞 Hang up pressed");
+      await TwilioVoice.instance.call.hangUp();
+    } catch (e) {
+      debugPrint("HANGUP ERROR: $e");
+    } finally {
+      if (mounted) {
+        setState(() => hangingUp = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final intercom = widget.intercom;
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(child: WebViewWidget(controller: controller)),
-
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'Llamada entrante: ${widget.identity}',
-                style: const TextStyle(color: Colors.white, fontSize: 20),
-              ),
+      appBar: AppBar(title: Text(intercom['name'])),
+      body: Column(
+        children: [
+          Expanded(child: LiveCameraView(streamUrl: intercom['streamUrl'])),
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                const Text(
+                  'Llamada entrante',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  intercom['name'],
+                  style: const TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: answering ? null : answerCall,
+                        icon: answering
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.call),
+                        label: const Text('Responder'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: loadingDoor ? null : openDoor,
+                        icon: loadingDoor
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.lock_open),
+                        label: const Text('Abrir'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: hangingUp ? null : hangUp,
+                        icon: hangingUp
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.call_end),
+                        label: const Text('Colgar'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton(
-                    onPressed: answerCall,
-                    child: const Icon(Icons.call),
-                  ),
-                  ElevatedButton(
-                    onPressed: openDoor,
-                    child: const Icon(Icons.lock_open),
-                  ),
-                  ElevatedButton(
-                    onPressed: hangUp,
-                    child: const Icon(Icons.call_end),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

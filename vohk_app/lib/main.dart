@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -42,12 +44,15 @@ class _VohkAppState extends State<VohkApp> {
       final data = message.data;
       print("📩 FOREGROUND MESSAGE: $data");
       if (data['type'] == 'incoming_call') {
+        final intercomJson = data['intercom'];
+        if (intercomJson == null) {
+          print("❌ Missing intercom payload");
+          return;
+        }
+        final intercom = Map<String, dynamic>.from(jsonDecode(intercomJson));
         navigatorKey.currentState?.push(
           MaterialPageRoute(
-            builder: (_) => IncomingCallScreen(
-              identity: data['identity'] ?? '',
-              streamUrl: data['streamUrl'] ?? '',
-            ),
+            builder: (_) => IncomingCallScreen(intercom: intercom),
           ),
         );
       }
@@ -56,12 +61,15 @@ class _VohkAppState extends State<VohkApp> {
       final data = message.data;
       print("📩 OPENED FROM BACKGROUND: $data");
       if (data['type'] == 'incoming_call') {
+        final intercomJson = data['intercom'];
+        if (intercomJson == null) {
+          print("❌ Missing intercom payload");
+          return;
+        }
+        final intercom = Map<String, dynamic>.from(jsonDecode(intercomJson));
         navigatorKey.currentState?.push(
           MaterialPageRoute(
-            builder: (_) => IncomingCallScreen(
-              identity: data['identity'] ?? '',
-              streamUrl: data['streamUrl'] ?? '',
-            ),
+            builder: (_) => IncomingCallScreen(intercom: intercom),
           ),
         );
       }

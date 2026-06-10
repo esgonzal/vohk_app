@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:vohk_app/models/event.dart';
 
 class VohkApi {
-  static const String baseUrl = 'https://api.vohk.cl/intercom';
+  static const String baseUrl = 'https://api.vohk.cl/app/intercom';
 
   static Future<List<dynamic>> getCameras() async {
     final res = await http.get(Uri.parse('$baseUrl/cameras'));
@@ -37,7 +38,7 @@ class VohkApi {
   static Future<String?> getStreamUrl(String id) async {
     try {
       final res = await http.get(
-        Uri.parse('https://api.vohk.cl/intercom/intercoms'),
+        Uri.parse('https://api.vohk.cl/app/intercom/intercoms'),
       );
       final list = jsonDecode(res.body) as List;
       final match = list.cast<Map<String, dynamic>?>().firstWhere(
@@ -49,5 +50,17 @@ class VohkApi {
       print('getStreamUrl error: $e');
       return null;
     }
+  }
+
+  static Future<List<Event>> fetchEvents() async {
+    final res = await http.get(Uri.parse('https://api.vohk.cl/app/events'));
+
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load events");
+    }
+
+    final List data = jsonDecode(res.body);
+
+    return data.map((e) => Event.fromJson(e)).toList().reversed.toList();
   }
 }
