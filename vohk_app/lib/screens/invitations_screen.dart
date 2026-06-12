@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:vohk_app/services/auth_service.dart';
 
 class InvitationsScreen extends StatefulWidget {
   const InvitationsScreen({super.key});
@@ -11,25 +12,38 @@ class InvitationsScreen extends StatefulWidget {
 }
 
 class _InvitationsScreenState extends State<InvitationsScreen> {
-  static const String _baseUrl = 'https://api.vohk.cl/app/intercom';
-  static const String _residentEmployeeNo = '1';
+  // static const String _baseUrl = 'https://api.vohk.cl/app/intercom';
+  static const String _baseUrl = 'http://10.10.11.51:8080/app/intercom';
   List<dynamic> _invitations = [];
   bool _loading = true;
+  List<String> _selectedDevices = [];
+  List<dynamic> _devices = [];
 
   @override
   void initState() {
     super.initState();
+    _loadDevices();
     _loadInvitations();
+  }
+
+  Future<void> _loadDevices() async {
+    setState(() => _loading = true);
+    try {
+      final res = await http.get(Uri.parse('$_baseUrl/intercoms'));
+      if (res.statusCode == 200) {
+        setState(() => _devices = jsonDecode(res.body));
+      }
+    } catch (e) {
+      _showSnack('Error cargando devices');
+    } finally {
+      setState(() => _loading = false);
+    }
   }
 
   Future<void> _loadInvitations() async {
     setState(() => _loading = true);
     try {
-      final res = await http.get(
-        Uri.parse(
-          '$_baseUrl/invitations?residentEmployeeNo=$_residentEmployeeNo',
-        ),
-      );
+      final res = await http.get(Uri.parse('$_baseUrl/invitations'));
       if (res.statusCode == 200) {
         setState(() => _invitations = jsonDecode(res.body));
       }
@@ -40,17 +54,21 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
     }
   }
 
-  Future<void> _createInvitation(DateTime begin, DateTime end) async {
+  Future<void> _createInvitation(DateTime begin, DateTime end, List<String> deviceIds) async {
     try {
       final res = await http.post(
         Uri.parse('$_baseUrl/invitations'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'residentEmployeeNo': _residentEmployeeNo,
-          'beginTime': begin.toIso8601String().substring(0, 19),
-          'endTime': end.toIso8601String().substring(0, 19),
+          'unitId': AuthService.primaryUnitId!,
+          'createdByUserId': AuthService.userId!,
+          'validFrom': begin.toUtc().toIso8601String(),
+          'validUntil': end.toUtc().toIso8601String(),
+          'type': 'visit',
+          'deviceIds': deviceIds
         }),
       );
+      print(res);
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         final url = data['url'];
@@ -139,7 +157,6 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Begin time
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text(
@@ -161,7 +178,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                     firstDate: now,
                     lastDate: now.add(const Duration(days: 365)),
                   );
-                  if (date != null)
+                  if (date != null) {
                     setLocal(
                       () => begin = DateTime(
                         date.year,
@@ -171,9 +188,9 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                         begin.minute,
                       ),
                     );
+                  }
                 },
               ),
-              // End time
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text(
@@ -195,7 +212,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                     firstDate: now,
                     lastDate: now.add(const Duration(days: 365)),
                   );
-                  if (date != null)
+                  if (date != null) {
                     setLocal(
                       () => end = DateTime(
                         date.year,
@@ -205,8 +222,42 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                         end.minute,
                       ),
                     );
+                  }
                 },
               ),
+
+              const SizedBox(height: 16),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Intercomunicadores',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ..._devices.map((device) {
+                final deviceId = device['id'] as String;
+                final deviceName = device['name'] as String;
+                return CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    deviceName,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  value: _selectedDevices.contains(deviceId),
+                  onChanged: (selected) {
+                    setLocal(() {
+                      if (selected == true) {
+                        _selectedDevices.add(deviceId);
+                      } else {
+                        _selectedDevices.remove(deviceId);
+                      }
+                    });
+                  },
+                );
+              }),
+
             ],
           ),
           actions: [
@@ -217,7 +268,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(ctx);
-                _createInvitation(begin, end);
+                _createInvitation(begin, end, _selectedDevices);
               },
               child: const Text('Crear'),
             ),
@@ -263,8 +314,13 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
     switch (status) {
       case 'registered':
         return Colors.green;
+      case 'active':
+        return Colors.blue;
       case 'pending':
         return Colors.orange;
+      case 'expired':
+      case 'revoked':
+        return Colors.red;
       default:
         return Colors.grey;
     }
@@ -274,8 +330,16 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
     switch (status) {
       case 'registered':
         return 'Registrada';
+      case 'active':
+        return 'Activa';
       case 'pending':
         return 'Pendiente';
+      case 'expired':
+        return 'Expirada';
+      case 'revoked':
+        return 'Revocada';
+      case 'used':
+        return 'Usada';
       default:
         return status;
     }
@@ -312,11 +376,12 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
               itemCount: _invitations.length,
               itemBuilder: (context, index) {
                 final inv = _invitations[index];
+                final invitationId = inv['invitation_id'] as String;
+                final visitorName = inv['visitor_name'] ?? 'Sin registrar';
                 final status = inv['status'] ?? 'pending';
-                final visitorName = inv['visitor']?['name'] ?? 'Sin registrar';
-                final beginTime = _formatDate(inv['beginTime']);
-                final endTime = _formatDate(inv['endTime']);
-                final dynamicCode = inv['dynamicCode'];
+                final beginTime = _formatDate(inv['valid_from'] as String?);
+                final endTime = _formatDate(inv['valid_until'] as String?);
+                final dynamicCode = inv['dynamic_code'] as String?;
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
@@ -331,7 +396,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                     leading: CircleAvatar(
                       backgroundColor: _statusColor(status).withOpacity(0.2),
                       child: Icon(
-                        status == 'registered'
+                        status == 'registered' || status == 'active'
                             ? Icons.person
                             : Icons.hourglass_empty,
                         color: _statusColor(status),
@@ -388,7 +453,8 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                     ),
                     trailing: IconButton(
                       icon: const Icon(Icons.delete_outline, color: Colors.red),
-                      onPressed: () => _confirmDelete(inv['id'], visitorName),
+                      onPressed: () =>
+                          _confirmDelete(invitationId, visitorName),
                     ),
                   ),
                 );

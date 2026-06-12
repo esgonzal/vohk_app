@@ -6,7 +6,7 @@ import '../widgets/live_camera_view.dart';
 class IntercomDetailScreen extends StatefulWidget {
   final dynamic intercom;
   const IntercomDetailScreen({super.key, required this.intercom});
-  
+
   @override
   State<IntercomDetailScreen> createState() => _IntercomDetailScreenState();
 }
@@ -32,12 +32,11 @@ class _IntercomDetailScreenState extends State<IntercomDetailScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text('Error abriendo puerta: $e')));
     } finally {
-      if (mounted) {
-        setState(() => loadingDoor = false);
-      }
+      if (mounted) setState(() => loadingDoor = false);
     }
   }
 
+  // FIX #8: button was hardcoded disabled (onPressed: null). Now wired up.
   Future<void> callIntercom() async {
     try {
       setState(() => loadingCall = true);
@@ -59,9 +58,7 @@ class _IntercomDetailScreenState extends State<IntercomDetailScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text('Error iniciando llamada: $e')));
     } finally {
-      if (mounted) {
-        setState(() => loadingCall = false);
-      }
+      if (mounted) setState(() => loadingCall = false);
     }
   }
 
@@ -93,7 +90,8 @@ class _IntercomDetailScreenState extends State<IntercomDetailScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: null,
+                    // FIX #8: was onPressed: null — now calls callIntercom()
+                    onPressed: loadingCall ? null : callIntercom,
                     icon: loadingCall
                         ? const SizedBox(
                             width: 18,

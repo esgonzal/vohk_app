@@ -18,6 +18,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   bool loadingDoor = false;
   bool answering = false;
   bool hangingUp = false;
+
   @override
   void initState() {
     super.initState();
@@ -53,7 +54,8 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   Future<void> openDoor() async {
     try {
       setState(() => loadingDoor = true);
-      final ok = await VohkApi.openDoor(widget.intercom['doorId'].toString());
+      // FIX #7: use device UUID ('id'), not doorId — matches /open-door/:deviceId
+      final ok = await VohkApi.openDoor(widget.intercom['id'].toString());
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -67,9 +69,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
         context,
       ).showSnackBar(SnackBar(content: Text('Error abriendo puerta: $e')));
     } finally {
-      if (mounted) {
-        setState(() => loadingDoor = false);
-      }
+      if (mounted) setState(() => loadingDoor = false);
     }
   }
 
@@ -81,9 +81,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     } catch (e) {
       debugPrint("ANSWER ERROR: $e");
     } finally {
-      if (mounted) {
-        setState(() => answering = false);
-      }
+      if (mounted) setState(() => answering = false);
     }
   }
 
@@ -95,9 +93,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     } catch (e) {
       debugPrint("HANGUP ERROR: $e");
     } finally {
-      if (mounted) {
-        setState(() => hangingUp = false);
-      }
+      if (mounted) setState(() => hangingUp = false);
     }
   }
 
