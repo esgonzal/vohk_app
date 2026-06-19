@@ -4,8 +4,7 @@ import 'package:vohk_app/models/event.dart';
 import 'api_config.dart';
 
 class VohkApi {
-  // FIX #1/#11: separate base URLs per route group via ApiConfig
-  static String get _intercom => ApiConfig.intercomBase;
+  static String get _intercom => ApiConfig.deviceBase;
 
   static Future<List<dynamic>> getCameras() async {
     final res = await http.get(Uri.parse('$_intercom/cameras'));
@@ -19,7 +18,6 @@ class VohkApi {
     return jsonDecode(res.body);
   }
 
-  // FIX #3: deviceId is the UUID, route is /app/intercom/open-door/:deviceId
   static Future<bool> openDoor(String deviceId) async {
     try {
       final res = await http.post(Uri.parse('$_intercom/open-door/$deviceId'));
@@ -34,8 +32,6 @@ class VohkApi {
     }
   }
 
-  // FIX #2: getStreamUrl() removed — the stream URL is already in the
-  // intercom object returned by getIntercoms(). Use intercom['url'] directly.
   static Future<List<Map<String, dynamic>>> getInvitations() async {
     final res = await http.get(Uri.parse('$_intercom/invitations'));
     if (res.statusCode != 200) throw Exception('Failed loading invitations');

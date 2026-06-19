@@ -49,17 +49,22 @@ class _LiveCameraViewState extends State<LiveCameraView> {
       await _pc!.setLocalDescription(offer);
       await Future.delayed(const Duration(milliseconds: 500));
       final localDesc = await _pc!.getLocalDescription();
-      final whepUrl = '${widget.streamUrl}/whep';
+      final whepUrl = '${widget.streamUrl}whep';
+      debugPrint('WHEP URL: $whepUrl');
       final request = await HttpClient().postUrl(Uri.parse(whepUrl));
       request.headers.set('Content-Type', 'application/sdp');
       request.add(utf8.encode(localDesc!.sdp!));
       final response = await request.close();
-      if (response.statusCode != 201) {
-        throw Exception('WHEP failed: ${response.statusCode}');
+
+      final body = await response.transform(utf8.decoder).join();
+      debugPrint('WHEP STATUS: ${response.statusCode}');
+      debugPrint('WHEP BODY: $body');
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('WHEP failed: ${response.statusCode} $body');
       }
-      final answerSdp = await response.transform(utf8.decoder).join();
       await _pc!.setRemoteDescription(
-        RTCSessionDescription(answerSdp, 'answer'),
+        RTCSessionDescription(body, 'answer'),
       );
     } catch (e) {
       debugPrint('WEBRTC ERROR: $e');

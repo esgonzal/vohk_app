@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:vohk_app/services/auth_service.dart';
+import '../services/api_config.dart';
 
 class InvitationsScreen extends StatefulWidget {
   const InvitationsScreen({super.key});
@@ -12,8 +13,7 @@ class InvitationsScreen extends StatefulWidget {
 }
 
 class _InvitationsScreenState extends State<InvitationsScreen> {
-  // static const String _baseUrl = 'https://api.vohk.cl/app/intercom';
-  static const String _baseUrl = 'http://10.10.11.51:8080/app/intercom';
+  static String get _baseUrl => ApiConfig.deviceBase;
   List<dynamic> _invitations = [];
   bool _loading = true;
   List<String> _selectedDevices = [];

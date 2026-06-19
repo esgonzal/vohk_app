@@ -24,15 +24,12 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WakelockPlus.enable();
-    debugPrint("📞 Incoming call");
-    debugPrint("Intercom: ${widget.intercom['name']}");
-    debugPrint("Stream: ${widget.intercom['streamUrl']}");
     _listenToCallEvents();
   }
 
   void _listenToCallEvents() {
     _callSubscription = TwilioVoice.instance.callEventsListener.listen((event) {
-      debugPrint("📞 Call event: $event");
+      debugPrint("INCOMING CALL SCREEN📞 Call event: $event");
       if (event == CallEvent.callEnded ||
           event == CallEvent.declined ||
           event.toString().contains("Abort")) {
@@ -54,7 +51,6 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   Future<void> openDoor() async {
     try {
       setState(() => loadingDoor = true);
-      // FIX #7: use device UUID ('id'), not doorId — matches /open-door/:deviceId
       final ok = await VohkApi.openDoor(widget.intercom['id'].toString());
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -104,7 +100,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
       appBar: AppBar(title: Text(intercom['name'])),
       body: Column(
         children: [
-          Expanded(child: LiveCameraView(streamUrl: intercom['streamUrl'])),
+          Expanded(child: LiveCameraView(streamUrl: intercom['url'] ?? '')),
           Container(
             padding: const EdgeInsets.all(16),
             child: Column(

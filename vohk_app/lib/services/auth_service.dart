@@ -6,14 +6,8 @@ import 'api_config.dart';
 class AuthService {
   static String? identity;
   static String? username;
-  // FIX #4: store userId and primaryUnitId so InvitationsScreen (and others)
-  // can use them without hardcoding. The backend /login response must return
-  // these fields. If it doesn't yet, add them to your login endpoint:
-  //   res.json({ username, identity, userId: user.user_id, primaryUnitId })
   static String? userId;
   static String? primaryUnitId;
-
-  // FIX #11: use shared ApiConfig instead of a duplicated hardcoded URL
   static String get baseUrl => ApiConfig.twilioBase;
 
   static Future<bool> login({
@@ -34,7 +28,6 @@ class AuthService {
         return false;
       }
       final data = jsonDecode(response.body);
-      print(data);
       username = data['username'] as String?;
       identity = data['identity'] as String?;
       userId = data['userId'] as String?;
@@ -61,7 +54,6 @@ class AuthService {
     identity = savedIdentity;
     userId = prefs.getString('userId');
     primaryUnitId = prefs.getString('primaryUnitId');
-    print('✅ Session restored: $username ($identity)');
     return true;
   }
 
