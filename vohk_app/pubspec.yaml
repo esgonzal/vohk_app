@@ -50,6 +50,7 @@ dependencies:
   wakelock_plus: ^1.2.8
   shared_preferences: ^2.5.3
   flutter_webrtc: ^1.4.1
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:

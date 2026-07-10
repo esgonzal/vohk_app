@@ -3,7 +3,8 @@ import '../vohk_theme.dart';
 
 /// Placeholder — backend support coming later.
 class EncomiendasScreen extends StatelessWidget {
-  const EncomiendasScreen({super.key});
+  final Map<String, dynamic>? currentUnit;
+  const EncomiendasScreen({super.key, this.currentUnit});
 
   @override
   Widget build(BuildContext context) {

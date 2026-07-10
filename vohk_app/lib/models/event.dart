@@ -1,22 +1,28 @@
 class Event {
-  final String camera;
-  final String timestamp;
-  final String type;
+  final String detectionId;
+  final String deviceId;
+  final String detectedClass;
   final double confidence;
+  final String detectedAt;
+  final String snapshotPath;
 
   Event({
-    required this.camera,
-    required this.timestamp,
-    required this.type,
+    required this.detectionId,
+    required this.deviceId,
+    required this.detectedClass,
     required this.confidence,
+    required this.detectedAt,
+    required this.snapshotPath,
   });
 
   factory Event.fromJson(Map<String, dynamic> json) {
     return Event(
-      camera: json['camera'],
-      timestamp: json['timestamp'],
-      type: json['type'],
-      confidence: (json['confidence'] as num).toDouble(),
+      detectionId: json['detection_id']?.toString() ?? '',
+      deviceId: json['device_id']?.toString() ?? '',
+      detectedClass: json['detected_class']?.toString() ?? '',
+      confidence: double.tryParse(json['confidence'].toString()) ?? 0.0,
+      detectedAt: json['detected_at']?.toString() ?? '',
+      snapshotPath: json['snapshot_path']?.toString() ?? '',
     );
   }
 }

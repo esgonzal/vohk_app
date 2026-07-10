@@ -40,6 +40,31 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Future<void> _forgotPassword(String email) async {
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingrese un correo electrónico')),
+      );
+      return;
+    }
+    try {
+      await AuthService.forgotPassword(email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Si el correo existe, recibirás instrucciones para cambiar tu contraseña.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -177,10 +202,61 @@ class _LoginScreenState extends State<LoginScreen> {
                         : const Text('Ingresar'),
                   ),
                 ),
+                const SizedBox(height: 16),
+                Center(
+                  child: TextButton(
+                    onPressed: _loading ? null : _showForgotPasswordDialog,
+                    child: const Text(
+                      '¿Olvidaste tu contraseña?',
+                      style: TextStyle(
+                        color: VohkColors.accent,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _showForgotPasswordDialog() async {
+    final emailController = TextEditingController();
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Recuperar contraseña'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Ingrese el correo asociado a su cuenta.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Correo electrónico',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+
+              await _forgotPassword(emailController.text.trim());
+            },
+            child: const Text('Enviar'),
+          ),
+        ],
       ),
     );
   }

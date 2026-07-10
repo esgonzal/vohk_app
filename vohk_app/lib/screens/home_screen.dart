@@ -1,13 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:vohk_app/services/vohk_api.dart';
-import 'package:vohk_app/services/auth_service.dart';
 import 'package:vohk_app/screens/intercom_detail_screen.dart';
 import 'package:vohk_app/screens/invitations_screen.dart';
-import 'package:vohk_app/screens/login_screen.dart';
 import '../vohk_theme.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final Map<String, dynamic>? currentUnit;
+  const HomeScreen({super.key, this.currentUnit});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -53,17 +53,33 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchIntercoms();
+    if (widget.currentUnit != null) {
+      _fetchIntercoms();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentUnit?['unit_id'] != widget.currentUnit?['unit_id']) {
+      setState(() {
+        _loading = true;
+      });
+      _fetchIntercoms();
+    }
   }
 
   Future<void> _fetchIntercoms() async {
     try {
-      final data = await VohkApi.getIntercoms();
-      if (mounted)
+      final data = await VohkApi.getDevices(
+        condominiumId: widget.currentUnit?['condominium_id'],
+      );
+      if (mounted) {
         setState(() {
-          _intercoms = data;
+          _intercoms = data.where((d) => d['type'] == 'intercom').toList();
           _loading = false;
         });
+      }
     } catch (e) {
       debugPrint('❌ Home fetchIntercoms: $e');
       if (mounted) setState(() => _loading = false);
@@ -72,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _openDoor(dynamic intercom) async {
     try {
-      final ok = await VohkApi.openDoor(intercom['id'].toString());
+      final ok = await VohkApi.openDoor(intercom['device_id'].toString());
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -87,29 +103,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _logout() async {
-    await AuthService.logout();
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false,
-    );
-  }
-
-  // ── Initials avatar ────────────────────────────────────────────────────────
-  String get _initials {
-    final name = AuthService.username ?? 'U';
-    final parts = name.trim().split(' ');
-    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    return name.isNotEmpty ? name[0].toUpperCase() : 'U';
-  }
-
-  String get _firstName {
-    final name = AuthService.username ?? 'Usuario';
-    return name.trim().split(' ').first;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -121,15 +114,8 @@ class _HomeScreenState extends State<HomeScreen> {
           onRefresh: _fetchIntercoms,
           child: CustomScrollView(
             slivers: [
-              SliverToBoxAdapter(child: _buildHeader()),
-              SliverToBoxAdapter(child: _buildMonitorBadge()),
-              SliverToBoxAdapter(
-                child: _SectionHeader(
-                  title: 'ACCESOS FAVORITOS',
-                  action: 'Editar',
-                  onAction: () {},
-                ),
-              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 8)),
+              //SliverToBoxAdapter(child: _buildMonitorBadge()),
               SliverToBoxAdapter(child: _buildAccesos()),
               SliverToBoxAdapter(child: _buildInvitarBanner()),
               SliverToBoxAdapter(child: _SectionHeader(title: 'PENDIENTES')),
@@ -146,84 +132,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'PROPIEDAD VERIFICADA',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: VohkColors.accent,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Hola, $_firstName',
-                  style: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: VohkColors.textPrimary,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      AuthService.identity ?? 'Residente',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: VohkColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(
-                      Icons.keyboard_arrow_down,
-                      size: 16,
-                      color: VohkColors.textSecondary,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          // Avatar
-          GestureDetector(
-            onTap: () => _showProfileSheet(),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: VohkColors.accentDim,
-                shape: BoxShape.circle,
-                border: Border.all(color: VohkColors.accent, width: 1.5),
-              ),
-              child: Center(
-                child: Text(
-                  _initials,
-                  style: const TextStyle(
-                    color: VohkColors.accent,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -488,82 +396,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             );
           }).toList(),
-        ),
-      ),
-    );
-  }
-
-  void _showProfileSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: VohkColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: VohkColors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: VohkColors.accentDim,
-                shape: BoxShape.circle,
-                border: Border.all(color: VohkColors.accent, width: 2),
-              ),
-              child: Center(
-                child: Text(
-                  _initials,
-                  style: const TextStyle(
-                    color: VohkColors.accent,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 22,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              AuthService.username ?? 'Usuario',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: VohkColors.textPrimary,
-              ),
-            ),
-            Text(
-              AuthService.identity ?? '',
-              style: const TextStyle(
-                color: VohkColors.textSecondary,
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 28),
-            const Divider(),
-            const SizedBox(height: 8),
-            ListTile(
-              leading: const Icon(Icons.logout, color: VohkColors.error),
-              title: const Text(
-                'Cerrar sesión',
-                style: TextStyle(color: VohkColors.error),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                _logout();
-              },
-            ),
-          ],
         ),
       ),
     );

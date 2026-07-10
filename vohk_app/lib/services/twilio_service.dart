@@ -1,38 +1,57 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:twilio_voice/twilio_voice.dart';
-import 'auth_service.dart';
 import 'api_config.dart';
+import 'auth_service.dart';
 
 class TwilioService {
   static bool callScreenOpen = false;
   static bool _initialized = false;
   static bool get initialized => _initialized;
   static StreamSubscription? _callSub;
-  static String get baseUrl => ApiConfig.twilioBase;
 
   static Future<void> initialize() async {
     if (_initialized) return;
     try {
-      await FirebaseMessaging.instance.requestPermission();
+      final prefs = await SharedPreferences.getInstance();
+      final identity = AuthService.identity ?? prefs.getString('identity');
+      final jwt = AuthService.jwt ?? prefs.getString('jwt');
       final fcmToken = await FirebaseMessaging.instance.getToken();
-      final identity = AuthService.identity;
-      await http.post(
-        Uri.parse('$baseUrl/register-fcm'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'identity': identity, 'fcmToken': fcmToken}),
+      if (jwt == null) {
+        throw Exception('User is not authenticated.');
+      }
+      if (identity == null) {
+        throw Exception('Missing identity.');
+      }
+      if (fcmToken == null) {
+        throw Exception('Unable to obtain FCM token.');
+      }
+      final registerResponse = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/auth/register-fcm'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $jwt',
+        },
+        body: jsonEncode({'fcmToken': fcmToken}),
       );
-      final uri = Uri.parse('$baseUrl/token').replace(
-        queryParameters: {'fcmToken': fcmToken ?? '', 'identity': identity},
+      if (registerResponse.statusCode != 200) {
+        throw Exception('Unable to register FCM: ${registerResponse.body}');
+      }
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/auth/token'),
+        headers: {'Authorization': 'Bearer $jwt'},
       );
-      final response = await http.get(uri);
+      if (response.statusCode != 200) {
+        throw Exception('Unable to obtain Twilio token: ${response.body}');
+      }
       final data = jsonDecode(response.body);
-      final token = data['token'];
       await TwilioVoice.instance.setTokens(
-        accessToken: token,
-        deviceToken: fcmToken ?? '',
+        accessToken: data['token'],
+        deviceToken: fcmToken,
       );
       await TwilioVoice.instance.requestMicAccess();
       await TwilioVoice.instance.requestCallPhonePermission();
@@ -40,33 +59,32 @@ class TwilioService {
       await TwilioVoice.instance.requestReadPhoneNumbersPermission();
       await TwilioVoice.instance.registerPhoneAccount();
       await _callSub?.cancel();
-      _callSub = TwilioVoice.instance.callEventsListener.listen((event) async {
-        if (event == CallEvent.ringing && !callScreenOpen) {
-          callScreenOpen = true;
-        }
-        if (event == CallEvent.callEnded || event == CallEvent.declined) {
-          callScreenOpen = false;
+      _callSub = TwilioVoice.instance.callEventsListener.listen((event) {
+        switch (event) {
+          case CallEvent.ringing:
+            if (!callScreenOpen) {
+              callScreenOpen = true;
+            }
+            break;
+          case CallEvent.callEnded:
+          case CallEvent.declined:
+            callScreenOpen = false;
+            break;
+          default:
+            break;
         }
       });
       _initialized = true;
     } catch (e) {
       _initialized = false;
-      print('❌ Twilio initialization error: $e');
+      debugPrint('❌ Twilio initialization error: $e');
     }
   }
 
-  static Future<void> callIntercom(String intercomId) async {
-    if (!_initialized) {
-      print('⚠️ Twilio not initialized, initializing now...');
-      await initialize();
-    }
-    try {
-      await TwilioVoice.instance.call.place(
-        to: intercomId,
-        from: AuthService.identity ?? '',
-      );
-    } catch (e) {
-      print('❌ Error placing call: $e');
-    }
+  static Future<void> dispose() async {
+    await _callSub?.cancel();
+    _callSub = null;
+    _initialized = false;
+    callScreenOpen = false;
   }
 }

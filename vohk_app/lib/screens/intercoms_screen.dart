@@ -4,34 +4,50 @@ import '../widgets/camera_card.dart';
 import 'intercom_detail_screen.dart';
 
 class IntercomsScreen extends StatefulWidget {
-  const IntercomsScreen({super.key});
+  final Map<String, dynamic>? currentUnit;
+  const IntercomsScreen({super.key, this.currentUnit});
   @override
   State<IntercomsScreen> createState() => _IntercomsScreenState();
 }
 
 class _IntercomsScreenState extends State<IntercomsScreen> {
-  List<dynamic> intercoms = [];
-  bool loading = true;
+  List<dynamic> _intercoms = [];
+  bool _loading = true;
+
   @override
   void initState() {
     super.initState();
-    fetchIntercoms();
+    if (widget.currentUnit != null) {
+      _fetchIntercoms();
+    }
   }
 
-  Future<void> fetchIntercoms() async {
+  @override
+  void didUpdateWidget(covariant IntercomsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentUnit?['unit_id'] != widget.currentUnit?['unit_id']) {
+      setState(() {
+        _loading = true;
+      });
+      _fetchIntercoms();
+    }
+  }
+
+  Future<void> _fetchIntercoms() async {
     try {
-      final data = await VohkApi.getIntercoms();
-      if (!mounted) return;
-      setState(() {
-        intercoms = data;
-        loading = false;
-      });
+      final data = await VohkApi.getDevices(
+        condominiumId: widget.currentUnit?['condominium_id'],
+      );
+      if (mounted) {
+        setState(() {
+          _intercoms = data.where((d) => d['type'] == 'intercom').toList();
+          _loading = false;
+          debugPrint('Intercoms: $_intercoms');
+        });
+      }
     } catch (e) {
-      debugPrint('❌ Error fetching intercoms: $e');
-      if (!mounted) return;
-      setState(() {
-        loading = false;
-      });
+      debugPrint('❌ Intercoms fetchIntercoms: $e');
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -39,12 +55,12 @@ class _IntercomsScreenState extends State<IntercomsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Intercoms')),
-      body: loading
+      body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
               padding: const EdgeInsets.all(16),
               child: GridView.builder(
-                itemCount: intercoms.length,
+                itemCount: _intercoms.length,
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   crossAxisSpacing: 16,
@@ -52,10 +68,10 @@ class _IntercomsScreenState extends State<IntercomsScreen> {
                   childAspectRatio: 1,
                 ),
                 itemBuilder: (context, index) {
-                  final intercom = intercoms[index];
+                  final intercom = _intercoms[index];
                   return CameraCard(
                     title: intercom['name'] ?? 'Intercom',
-                    snapshotUrl: intercom['snapshot'] ?? '',
+                    snapshotUrl: intercom['snapshot_url'] ?? '',
                     onTap: () {
                       Navigator.push(
                         context,

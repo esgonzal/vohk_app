@@ -6,14 +6,15 @@ import 'package:vohk_app/services/auth_service.dart';
 import '../services/api_config.dart';
 
 class InvitationsScreen extends StatefulWidget {
-  const InvitationsScreen({super.key});
+  final Map<String, dynamic>? currentUnit;
+  const InvitationsScreen({super.key, this.currentUnit});
 
   @override
   State<InvitationsScreen> createState() => _InvitationsScreenState();
 }
 
 class _InvitationsScreenState extends State<InvitationsScreen> {
-  static String get _baseUrl => ApiConfig.deviceBase;
+  static String get _baseUrl => ApiConfig.baseUrl;
   List<dynamic> _invitations = [];
   bool _loading = true;
   List<String> _selectedDevices = [];
@@ -60,7 +61,6 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
         Uri.parse('$_baseUrl/invitations'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'unitId': AuthService.primaryUnitId!,
           'createdByUserId': AuthService.userId!,
           'validFrom': begin.toUtc().toIso8601String(),
           'validUntil': end.toUtc().toIso8601String(),

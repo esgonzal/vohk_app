@@ -18,20 +18,16 @@ class _IntercomDetailScreenState extends State<IntercomDetailScreen> {
   @override
   void initState() {
     super.initState();
-
     final intercom = widget.intercom;
-
     debugPrint("INTERCOM RAW => $intercom");
-
-    streamUrl = intercom['url'] ?? '';
-
+    streamUrl = intercom['stream_url'] ?? '';
     debugPrint("STREAM URL NORMALIZED => $streamUrl");
   }
 
   Future<void> openDoor() async {
     try {
       setState(() => loadingDoor = true);
-      final ok = await VohkApi.openDoor(widget.intercom['id']);
+      final ok = await VohkApi.openDoor(widget.intercom['device_id']);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -57,7 +53,7 @@ class _IntercomDetailScreenState extends State<IntercomDetailScreen> {
       body: Column(
         children: [
           Expanded(
-            child: LiveCameraView(streamUrl: intercom['url'] ?? ''),
+            child: LiveCameraView(streamUrl: intercom['stream_url'] ?? ''),
           ),
           Container(
             padding: const EdgeInsets.all(16),
