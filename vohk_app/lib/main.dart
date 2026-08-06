@@ -1,24 +1,66 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
 import 'package:vohk_app/screens/main_shell.dart';
 import 'package:vohk_app/services/auth_service.dart';
 import 'package:vohk_app/services/notification_service.dart';
 import 'package:vohk_app/services/twilio_service.dart';
 import 'screens/login_screen.dart';
+import 'package:vohk_app/services/incoming_call_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+StreamSubscription<String>? _tokenRefreshSubscription;
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  FirebaseMessaging.onBackgroundMessage(NotificationService.backgroundHandler);
-  final hasSession = await AuthService.restoreSession();
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  await NotificationService.initialize();
+  _tokenRefreshSubscription = NotificationService.onTokenRefresh.listen(_handleFcmTokenRefresh);
+  var hasSession = await AuthService.restoreSession();
   if (hasSession) {
-    await TwilioService.initialize();
+    String? fcmToken;
+    try {
+      fcmToken = await NotificationService.requestPermissionAndGetToken();
+      await AuthService.registerFcmToken(fcmToken);
+      await TwilioService.initialize(jwt: AuthService.jwt!, identity: AuthService.identity!, deviceToken: fcmToken);
+    } catch (error, stackTrace) {
+      debugPrint('Saved-session initialization failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      try {
+        if (AuthService.jwt != null) {
+          await TwilioService.unregister(jwt: AuthService.jwt!);
+        }
+      } catch (_) {}
+      try {
+        if (fcmToken != null) {
+          await AuthService.unregisterFcmToken(fcmToken);
+        }
+      } catch (_) {}
+      await TwilioService.dispose();
+      await AuthService.logout();
+      hasSession = false;
+    }
   }
-  await NotificationService.initialize(navigatorKey);
   runApp(VohkApp(hasSession: hasSession));
+  await IncomingCallService.initialize(navigatorKey);
+}
+
+Future<void> _handleFcmTokenRefresh(String newToken) async {
+  final jwt = AuthService.jwt;
+  if (jwt == null || jwt.isEmpty) {
+    return;
+  }
+  try {
+    await AuthService.registerFcmToken(newToken);
+    if (TwilioService.initialized) {
+      await TwilioService.refreshDeviceRegistration(jwt: jwt, deviceToken: newToken);
+    }
+  } catch (error, stackTrace) {
+    debugPrint('FCM token refresh synchronization failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
 }
 
 class VohkApp extends StatelessWidget {

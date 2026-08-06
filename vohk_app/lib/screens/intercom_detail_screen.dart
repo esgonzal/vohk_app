@@ -21,7 +21,6 @@ class _IntercomDetailScreenState extends State<IntercomDetailScreen> {
     final intercom = widget.intercom;
     debugPrint("INTERCOM RAW => $intercom");
     streamUrl = intercom['stream_url'] ?? '';
-    debugPrint("STREAM URL NORMALIZED => $streamUrl");
   }
 
   Future<void> openDoor() async {

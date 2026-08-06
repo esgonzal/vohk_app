@@ -5,7 +5,8 @@ import 'live_camera_screen.dart';
 
 class CamerasScreen extends StatefulWidget {
   final Map<String, dynamic>? currentUnit;
-  const CamerasScreen({super.key, this.currentUnit});
+  final Future<void> Function() onRefreshUnits;
+  const CamerasScreen({super.key, this.currentUnit, required this.onRefreshUnits});
   @override
   State<CamerasScreen> createState() => _CamerasScreenState();
 }
@@ -13,12 +14,18 @@ class CamerasScreen extends StatefulWidget {
 class _CamerasScreenState extends State<CamerasScreen> {
   List<dynamic> _cameras = [];
   bool _loading = true;
+
   @override
   void initState() {
     super.initState();
     if (widget.currentUnit != null) {
       _fetchCameras();
     }
+  }
+
+  Future<void> _refresh() async {
+    await _fetchCameras();
+    await widget.onRefreshUnits();
   }
 
   @override
@@ -34,14 +41,12 @@ class _CamerasScreenState extends State<CamerasScreen> {
 
   Future<void> _fetchCameras() async {
     try {
-      final data = await VohkApi.getDevices(
-        condominiumId: widget.currentUnit?['condominium_id'],
-      );
+      final data = await VohkApi.getDevices(condominiumId: widget.currentUnit?['condominium_id']);
       if (mounted) {
         setState(() {
           _cameras = data.where((d) => d['type'] == 'camera').toList();
           _loading = false;
-          debugPrint('Cameras: $_cameras');
+          //debugPrint('Cameras: $_cameras');
         });
       }
     } catch (e) {
@@ -56,16 +61,13 @@ class _CamerasScreenState extends State<CamerasScreen> {
       appBar: AppBar(title: const Text('Cámaras')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16),
+          : RefreshIndicator(
+              onRefresh: _refresh,
               child: GridView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
                 itemCount: _cameras.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 1,
-                ),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 1),
                 itemBuilder: (context, index) {
                   final cam = _cameras[index];
                   return CameraCard(
@@ -75,10 +77,7 @@ class _CamerasScreenState extends State<CamerasScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => LiveCameraScreen(
-                            title: cam['name'] ?? 'Live Camera',
-                            url: cam['stream_url'],
-                          ),
+                          builder: (_) => LiveCameraScreen(title: cam['name'] ?? 'Live Camera', url: cam['stream_url']),
                         ),
                       );
                     },

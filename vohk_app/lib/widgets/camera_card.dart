@@ -5,17 +5,11 @@ class CameraCard extends StatelessWidget {
   final String snapshotUrl;
   final VoidCallback onTap;
 
-  const CameraCard({
-    super.key,
-    required this.title,
-    required this.snapshotUrl,
-    required this.onTap,
-  });
+  const CameraCard({super.key, required this.title, required this.snapshotUrl, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final imageUrl = '$snapshotUrl?t=${DateTime.now().millisecondsSinceEpoch}';
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -36,19 +30,11 @@ class CameraCard extends StatelessWidget {
               alignment: Alignment.bottomCenter,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
-                ),
+                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black.withOpacity(0.7)]),
               ),
               child: Text(
                 title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
           ],

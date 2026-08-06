@@ -1,45 +1,59 @@
-import 'dart:convert';
+import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/material.dart';
-import '../screens/incoming_call_screen.dart';
+import 'package:flutter/foundation.dart';
+
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+}
 
 class NotificationService {
-  static late GlobalKey<NavigatorState> _navigatorKey;
   static bool _initialized = false;
+  static Stream<String> get onTokenRefresh => FirebaseMessaging.instance.onTokenRefresh;
 
-  static Future<void> initialize(GlobalKey<NavigatorState> navigatorKey) async {
+  static Future<void> initialize() async {
     if (_initialized) return;
-    _navigatorKey = navigatorKey;
+    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
     _initialized = true;
-    await FirebaseMessaging.instance.requestPermission();
-    FirebaseMessaging.onMessage.listen(_handleMessage);
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessage);
-    final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
-    if (initialMessage != null) {
-      _handleMessage(initialMessage);
-    }
   }
 
-  static Future<void> backgroundHandler(RemoteMessage message) async {
-    await Firebase.initializeApp();
+  static Future<String> requestPermissionAndGetToken() async {
+    final settings = await FirebaseMessaging.instance.requestPermission(alert: true, badge: true, sound: true, provisional: false);
+    if (settings.authorizationStatus == AuthorizationStatus.denied) {
+      throw Exception('Notification permission was denied.');
+    }
+    return _getRequiredToken();
   }
 
-  static void _handleMessage(RemoteMessage message) {
-    final data = message.data;
-    if (data['type'] != 'incoming_call') return;
-    final rawIntercom = data['intercom'];
-    if (rawIntercom == null) return;
-    Map<String, dynamic> intercom;
-    if (rawIntercom is String) {
-      intercom = jsonDecode(rawIntercom);
-    } else if (rawIntercom is Map) {
-      intercom = Map<String, dynamic>.from(rawIntercom);
-    } else {
-      return;
+  static Future<String?> getToken() {
+    return FirebaseMessaging.instance.getToken();
+  }
+
+  static Future<String> _getRequiredToken() async {
+    if (Platform.isIOS) {
+      String? apnsToken;
+      for (var attempt = 0; attempt < 10; attempt++) {
+        apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+        if (apnsToken != null && apnsToken.isNotEmpty) {
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      }
+      if (apnsToken == null || apnsToken.isEmpty) {
+        throw Exception('Firebase could not obtain the APNs token.');
+      }
     }
-    _navigatorKey.currentState?.push(
-      MaterialPageRoute(builder: (_) => IncomingCallScreen(intercom: intercom)),
-    );
+    final token = await FirebaseMessaging.instance.getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Firebase could not obtain an FCM token.');
+    }
+    return token;
+  }
+
+  static void _handleForegroundMessage(RemoteMessage message) {
+    if (message.data['type'] == 'incoming_call') {
+      debugPrint('Received incoming-call metadata through Firebase.');
+    }
   }
 }

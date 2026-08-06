@@ -96,55 +96,41 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   @override
   Widget build(BuildContext context) {
     final intercom = widget.intercom;
-
     return Scaffold(
       appBar: AppBar(title: Text(intercom['name'])),
-
       body: Column(
         children: [
           Expanded(
             child: LiveCameraView(streamUrl: intercom['stream_url'] ?? ''),
           ),
-
           Container(
             padding: const EdgeInsets.all(16),
-
             child: Column(
               children: [
                 const Text(
                   'Llamada entrante',
-
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
-
                 const SizedBox(height: 8),
-
                 Text(
                   intercom['name'],
-
                   style: const TextStyle(fontSize: 16, color: Colors.grey),
                 ),
-
                 const SizedBox(height: 20),
-
                 Row(
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: answering ? null : answerCall,
-
                         icon: answering
                             ? const SizedBox(
                                 width: 18,
-
                                 height: 18,
-
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                 ),
                               )
                             : const Icon(Icons.call),
-
                         label: const Text(
                           'Responder',
                           style: TextStyle(fontSize: 12),
@@ -152,25 +138,19 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                         ),
                       ),
                     ),
-
                     const SizedBox(width: 12),
-
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: loadingDoor ? null : openDoor,
-
                         icon: loadingDoor
                             ? const SizedBox(
                                 width: 18,
-
                                 height: 18,
-
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                 ),
                               )
                             : const Icon(Icons.lock_open),
-
                         label: const Text(
                           'Abrir',
                           style: TextStyle(fontSize: 12),
@@ -178,25 +158,19 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                         ),
                       ),
                     ),
-
                     const SizedBox(width: 12),
-
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: hangingUp ? null : hangUp,
-
                         icon: hangingUp
                             ? const SizedBox(
                                 width: 18,
-
                                 height: 18,
-
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                 ),
                               )
                             : const Icon(Icons.call_end),
-
                         label: const Text(
                           'Colgar',
                           style: TextStyle(fontSize: 12),

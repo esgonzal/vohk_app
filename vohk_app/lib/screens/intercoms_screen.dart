@@ -5,7 +5,8 @@ import 'intercom_detail_screen.dart';
 
 class IntercomsScreen extends StatefulWidget {
   final Map<String, dynamic>? currentUnit;
-  const IntercomsScreen({super.key, this.currentUnit});
+  final Future<void> Function() onRefreshUnits;
+  const IntercomsScreen({super.key, this.currentUnit, required this.onRefreshUnits});
   @override
   State<IntercomsScreen> createState() => _IntercomsScreenState();
 }
@@ -22,6 +23,11 @@ class _IntercomsScreenState extends State<IntercomsScreen> {
     }
   }
 
+  Future<void> _refresh() async {
+    await _fetchIntercoms();
+    await widget.onRefreshUnits();
+  }
+
   @override
   void didUpdateWidget(covariant IntercomsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -35,14 +41,12 @@ class _IntercomsScreenState extends State<IntercomsScreen> {
 
   Future<void> _fetchIntercoms() async {
     try {
-      final data = await VohkApi.getDevices(
-        condominiumId: widget.currentUnit?['condominium_id'],
-      );
+      final data = await VohkApi.getDevices(condominiumId: widget.currentUnit?['condominium_id']);
       if (mounted) {
         setState(() {
           _intercoms = data.where((d) => d['type'] == 'intercom').toList();
           _loading = false;
-          debugPrint('Intercoms: $_intercoms');
+          //debugPrint('Intercoms: $_intercoms');
         });
       }
     } catch (e) {
@@ -57,29 +61,20 @@ class _IntercomsScreenState extends State<IntercomsScreen> {
       appBar: AppBar(title: const Text('Intercoms')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16),
+          : RefreshIndicator(
+              onRefresh: _refresh,
               child: GridView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
                 itemCount: _intercoms.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 1,
-                ),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 1),
                 itemBuilder: (context, index) {
                   final intercom = _intercoms[index];
                   return CameraCard(
                     title: intercom['name'] ?? 'Intercom',
                     snapshotUrl: intercom['snapshot_url'] ?? '',
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              IntercomDetailScreen(intercom: intercom),
-                        ),
-                      );
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => IntercomDetailScreen(intercom: intercom)));
                     },
                   );
                 },

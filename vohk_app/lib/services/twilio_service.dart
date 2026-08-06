@@ -1,70 +1,96 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:firebase_messaging/firebase_messaging.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:twilio_voice/twilio_voice.dart';
 import 'api_config.dart';
-import 'auth_service.dart';
 
 class TwilioService {
   static bool callScreenOpen = false;
   static bool _initialized = false;
+  static StreamSubscription? _callSubscription;
   static bool get initialized => _initialized;
-  static StreamSubscription? _callSub;
 
-  static Future<void> initialize() async {
+  static Future<void> initialize({required String jwt, required String identity, required String deviceToken}) async {
     if (_initialized) return;
+    if (jwt.isEmpty) {
+      throw Exception('Missing authentication token.');
+    }
+    if (identity.isEmpty) {
+      throw Exception('Missing SIP identity.');
+    }
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final identity = AuthService.identity ?? prefs.getString('identity');
-      final jwt = AuthService.jwt ?? prefs.getString('jwt');
-      final fcmToken = await FirebaseMessaging.instance.getToken();
-      if (jwt == null) {
-        throw Exception('User is not authenticated.');
-      }
-      if (identity == null) {
-        throw Exception('Missing identity.');
-      }
-      if (fcmToken == null) {
-        throw Exception('Unable to obtain FCM token.');
-      }
-      final registerResponse = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/auth/register-fcm'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $jwt',
-        },
-        body: jsonEncode({'fcmToken': fcmToken}),
-      );
-      if (registerResponse.statusCode != 200) {
-        throw Exception('Unable to register FCM: ${registerResponse.body}');
-      }
-      final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/auth/token'),
-        headers: {'Authorization': 'Bearer $jwt'},
-      );
-      if (response.statusCode != 200) {
-        throw Exception('Unable to obtain Twilio token: ${response.body}');
-      }
-      final data = jsonDecode(response.body);
-      await TwilioVoice.instance.setTokens(
-        accessToken: data['token'],
-        deviceToken: fcmToken,
-      );
-      await TwilioVoice.instance.requestMicAccess();
-      await TwilioVoice.instance.requestCallPhonePermission();
-      await TwilioVoice.instance.requestReadPhoneStatePermission();
-      await TwilioVoice.instance.requestReadPhoneNumbersPermission();
-      await TwilioVoice.instance.registerPhoneAccount();
-      await _callSub?.cancel();
-      _callSub = TwilioVoice.instance.callEventsListener.listen((event) {
+      await _registerDevice(jwt: jwt, deviceToken: deviceToken);
+      await _requestCallPermissions();
+      await _listenToCallEvents();
+      _initialized = true;
+      debugPrint('Twilio initialized for identity $identity.');
+    } catch (error, stackTrace) {
+      _initialized = false;
+      debugPrint('Twilio initialization failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  static Future<void> refreshDeviceRegistration({required String jwt, required String deviceToken}) async {
+    await _registerDevice(jwt: jwt, deviceToken: deviceToken);
+  }
+
+  static Future<void> unregister({required String jwt}) async {
+    if (jwt.isEmpty) return;
+    final accessToken = await _fetchAccessToken(jwt);
+    final result = await TwilioVoice.instance.unregister(accessToken: accessToken);
+    if (result == false) {
+      throw Exception('Twilio rejected device unregistration.');
+    }
+    debugPrint('Device unregistered from Twilio.');
+  }
+
+  static Future<String> _fetchAccessToken(String jwt) async {
+    final response = await http.get(Uri.parse('${ApiConfig.baseUrl}/auth/token'), headers: {'Authorization': 'Bearer $jwt'});
+    if (response.statusCode != 200) {
+      throw Exception('Unable to obtain Twilio token: ${response.statusCode} ${response.body}');
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw Exception('Invalid Twilio token response.');
+    }
+    final accessToken = decoded['token']?.toString();
+    if (accessToken == null || accessToken.isEmpty) {
+      throw Exception('Backend returned an empty Twilio token.');
+    }
+    return accessToken;
+  }
+
+  static Future<void> _registerDevice({required String jwt, required String deviceToken}) async {
+    final accessToken = await _fetchAccessToken(jwt);
+    final result = await TwilioVoice.instance.setTokens(accessToken: accessToken, deviceToken: deviceToken);
+    if (result == false) {
+      throw Exception('Twilio rejected device registration.');
+    }
+  }
+
+  static Future<void> _requestCallPermissions() async {
+    await TwilioVoice.instance.requestMicAccess();
+    if (!Platform.isAndroid) return;
+    await TwilioVoice.instance.requestCallPhonePermission();
+    await TwilioVoice.instance.requestReadPhoneStatePermission();
+    await TwilioVoice.instance.requestReadPhoneNumbersPermission();
+    final registered = await TwilioVoice.instance.registerPhoneAccount();
+    if (registered != true) {
+      throw Exception('Android could not register the Vohk calling account.');
+    }
+  }
+
+  static Future<void> _listenToCallEvents() async {
+    await _callSubscription?.cancel();
+    _callSubscription = TwilioVoice.instance.callEventsListener.listen(
+      (event) {
         switch (event) {
           case CallEvent.ringing:
-            if (!callScreenOpen) {
-              callScreenOpen = true;
-            }
+            callScreenOpen = true;
             break;
           case CallEvent.callEnded:
           case CallEvent.declined:
@@ -73,17 +99,17 @@ class TwilioService {
           default:
             break;
         }
-      });
-      _initialized = true;
-    } catch (e) {
-      _initialized = false;
-      debugPrint('❌ Twilio initialization error: $e');
-    }
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        debugPrint('Twilio call event error: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      },
+    );
   }
 
   static Future<void> dispose() async {
-    await _callSub?.cancel();
-    _callSub = null;
+    await _callSubscription?.cancel();
+    _callSubscription = null;
     _initialized = false;
     callScreenOpen = false;
   }

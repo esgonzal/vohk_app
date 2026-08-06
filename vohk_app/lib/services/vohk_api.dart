@@ -7,44 +7,81 @@ import 'api_config.dart';
 import 'auth_service.dart';
 
 class VohkApi {
+  static Future<List<Map<String, dynamic>>> getAdminCondominiums() async {
+    final response = await http.get(Uri.parse('${ApiConfig.baseUrl}/condominiums/mobile'), headers: _headers());
+    if (response.statusCode != 200) {
+      throw Exception(_responseError(response, 'No se pudieron cargar los condominios.'));
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) {
+      throw Exception('Respuesta inválida al cargar condominios.');
+    }
+    return decoded.map((item) {
+      final condominium = Map<String, dynamic>.from(item as Map);
+      return {...condominium, 'condominium_name': condominium['name']};
+    }).toList();
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminResidents(String condominiumId) async {
+    final response = await http.get(Uri.parse('${ApiConfig.baseUrl}/users/$condominiumId'), headers: _headers());
+    if (response.statusCode != 200) {
+      throw Exception(_responseError(response, 'No se pudieron cargar los residentes.'));
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) {
+      throw Exception('Respuesta inválida al cargar residentes.');
+    }
+    return decoded.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+  }
+
   static Future<List<dynamic>> getCameras() async {
-    final res = await http.get(
-      Uri.parse('${ApiConfig.baseUrl}/device/cameras'),
-      headers: _headers(),
-    );
+    final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/devices/cameras'), headers: _headers());
     if (res.statusCode != 200) throw Exception('Failed loading cameras');
     return jsonDecode(res.body);
   }
 
   static Future<List<dynamic>> getIntercoms() async {
-    final res = await http.get(
-      Uri.parse('${ApiConfig.baseUrl}/device/intercoms'),
-      headers: _headers(),
-    );
+    final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/devices/intercoms'), headers: _headers());
     if (res.statusCode != 200) throw Exception('Failed loading intercoms');
     return jsonDecode(res.body);
   }
 
-  static Future<List<dynamic>> getDevices({String? condominiumId}) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}/device/location-mobile')
-        .replace(
-          queryParameters: condominiumId == null
-              ? null
-              : {'condominiumId': condominiumId},
-        );
-    final res = await http.get(uri, headers: _headers());
-    if (res.statusCode != 200) {
-      throw Exception('Failed loading devices');
+  static Future<Map<String, dynamic>?> getIntercomByDeviceId(String deviceId) async {
+    final intercoms = await getIntercoms();
+    for (final rawIntercom in intercoms) {
+      if (rawIntercom is! Map) {
+        continue;
+      }
+      final intercom = Map<String, dynamic>.from(rawIntercom);
+      if (intercom['id']?.toString() != deviceId) {
+        continue;
+      }
+      return {
+        'device_id': intercom['id']?.toString() ?? '',
+        'name': intercom['name']?.toString() ?? 'Intercomunicador',
+        'snapshot_url': intercom['snapshot']?.toString() ?? '',
+        'stream_url': intercom['url']?.toString() ?? '',
+      };
     }
-    return jsonDecode(res.body);
+    return null;
+  }
+
+  static Future<List<dynamic>> getDevices({required String condominiumId}) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/devices/location-mobile').replace(queryParameters: {'condominiumId': condominiumId});
+    final response = await http.get(uri, headers: _headers());
+    if (response.statusCode != 200) {
+      throw Exception(_responseError(response, 'No se pudieron cargar los dispositivos.'));
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) {
+      throw Exception('Respuesta inválida al cargar dispositivos.');
+    }
+    return decoded;
   }
 
   static Future<bool> openDoor(String deviceId) async {
     try {
-      final res = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/device/open-door/$deviceId'),
-        headers: _headers(),
-      );
+      final res = await http.post(Uri.parse('${ApiConfig.baseUrl}/devices/open-door/$deviceId'), headers: _headers());
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         return data['ok'] == true;
@@ -56,50 +93,49 @@ class VohkApi {
     }
   }
 
-  static Future<List<Map<String, dynamic>>> getInvitations() async {
-    final res = await http.get(
-      Uri.parse('${ApiConfig.baseUrl}/device/invitations'),
-      headers: _headers(),
-    );
-    if (res.statusCode != 200) throw Exception('Failed loading invitations');
-    return List<Map<String, dynamic>>.from(jsonDecode(res.body));
+  static Future<List<Map<String, dynamic>>> getInvitations({required String unitId}) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/invitation').replace(queryParameters: {'unitId': unitId});
+    final response = await http.get(uri, headers: _headers());
+    if (response.statusCode != 200) {
+      throw Exception(_responseError(response, 'No se pudieron cargar las invitaciones.'));
+    }
+    final decoded = jsonDecode(response.body) as List<dynamic>;
+    return decoded.map((item) => Map<String, dynamic>.from(item as Map)).toList();
   }
 
   static Future<Map<String, dynamic>> createInvitation({
     required String unitId,
-    required String createdByUserId,
-    required String validFrom,
-    required String validUntil,
+    required DateTime validFrom,
+    required DateTime validUntil,
+    required List<String> deviceIds,
     String type = 'visit',
   }) async {
-    final res = await http.post(
-      Uri.parse('${ApiConfig.baseUrl}/device/invitations'),
+    final response = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/invitation'),
       headers: _headers(),
       body: jsonEncode({
         'unitId': unitId,
-        'createdByUserId': createdByUserId,
-        'validFrom': validFrom,
-        'validUntil': validUntil,
+        'validFrom': validFrom.toUtc().toIso8601String(),
+        'validUntil': validUntil.toUtc().toIso8601String(),
         'type': type,
+        'deviceIds': deviceIds,
       }),
     );
-    if (res.statusCode != 200) throw Exception('Failed creating invitation');
-    return jsonDecode(res.body);
+    if (response.statusCode != 201) {
+      throw Exception(_responseError(response, 'No se pudo crear la invitación.'));
+    }
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
   static Future<void> deleteInvitation(String invitationId) async {
-    final res = await http.delete(
-      Uri.parse('${ApiConfig.baseUrl}/device/invitations/$invitationId'),
-      headers: _headers(),
-    );
-    if (res.statusCode != 200) throw Exception('Failed deleting invitation');
+    final response = await http.delete(Uri.parse('${ApiConfig.baseUrl}/invitation/$invitationId'), headers: _headers());
+    if (response.statusCode != 200) {
+      throw Exception(_responseError(response, 'No se pudo eliminar la invitación.'));
+    }
   }
 
   static Future<List<Event>> fetchDetections() async {
-    final res = await http.get(
-      Uri.parse('${ApiConfig.baseUrl}/events'),
-      headers: _headers(),
-    );
+    final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/events'), headers: _headers());
     if (res.statusCode != 200) {
       throw Exception('Failed to load detections');
     }
@@ -109,14 +145,11 @@ class VohkApi {
 
   static Future<List<dynamic>> getResidentUnits() async {
     try {
-      final res = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/admin/resident/units'),
-        headers: _headers(),
-      );
+      final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/admin/resident/units'), headers: _headers());
       if (res.statusCode == 200) {
         return jsonDecode(res.body) as List<dynamic>;
       }
-      debugPrint('Get resident units error: ${res.statusCode} ${res.body}');
+      debugPrint('getResidentUnits in VohkApi line 107: ${res.body}');
       throw Exception('Failed loading resident units');
     } catch (e) {
       debugPrint('Get resident units exception: $e');
@@ -124,50 +157,51 @@ class VohkApi {
     }
   }
 
-  static Future<void> updateUsername(String username) async {
-    final res = await http.put(
-      Uri.parse('${ApiConfig.baseUrl}/admin/username'),
-      headers: _headers(),
-      body: jsonEncode({'username': username}),
-    );
-    if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['error']);
+  static Future<String> updateUsername(String username) async {
+    final response = await http.put(Uri.parse('${ApiConfig.baseUrl}/users/username'), headers: _headers(), body: jsonEncode({'username': username}));
+    if (response.statusCode != 200) {
+      throw Exception(_responseError(response, 'No se pudo actualizar el nombre de usuario.'));
     }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw Exception('Respuesta inválida al actualizar el nombre de usuario.');
+    }
+    final updatedUsername = decoded['username']?.toString();
+    if (updatedUsername == null || updatedUsername.isEmpty) {
+      throw Exception('El servidor no devolvió el nombre de usuario actualizado.');
+    }
+    return updatedUsername;
   }
 
-  static Future<void> updateEmail(String email) async {
-    final res = await http.put(
-      Uri.parse('${ApiConfig.baseUrl}/admin/email'),
-      headers: _headers(),
-      body: jsonEncode({'email': email}),
-    );
-    if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['error']);
+  static Future<String> updateEmail(String email) async {
+    final response = await http.put(Uri.parse('${ApiConfig.baseUrl}/users/email'), headers: _headers(), body: jsonEncode({'email': email}));
+    if (response.statusCode != 200) {
+      throw Exception(_responseError(response, 'No se pudo actualizar el correo electrónico.'));
     }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw Exception('Respuesta inválida al actualizar el correo electrónico.');
+    }
+    final updatedEmail = decoded['email']?.toString();
+    if (updatedEmail == null || updatedEmail.isEmpty) {
+      throw Exception('El servidor no devolvió el correo actualizado.');
+    }
+    return updatedEmail;
   }
 
-  static Future<void> updatePassword({
-    required String currentPassword,
-    required String newPassword,
-  }) async {
-    final res = await http.put(
-      Uri.parse('${ApiConfig.baseUrl}/admin/password'),
+  static Future<void> updatePassword({required String currentPassword, required String newPassword}) async {
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/users/password'),
       headers: _headers(),
-      body: jsonEncode({
-        'currentPassword': currentPassword,
-        'newPassword': newPassword,
-      }),
+      body: jsonEncode({'currentPassword': currentPassword, 'newPassword': newPassword}),
     );
-    if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['error']);
+    if (response.statusCode != 200) {
+      throw Exception(_responseError(response, 'No se pudo actualizar la contraseña.'));
     }
   }
 
   static Future<Map<String, dynamic>> getAccessMethods() async {
-    final res = await http.get(
-      Uri.parse('${ApiConfig.baseUrl}/device/resident/access-methods'),
-      headers: _headers(),
-    );
+    final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/devices/resident/access-methods'), headers: _headers());
     if (res.statusCode != 200) {
       throw Exception('Failed loading access methods');
     }
@@ -175,36 +209,57 @@ class VohkApi {
   }
 
   static Future<void> updateResidentFace(File photo) async {
-    final request = http.MultipartRequest(
-      'PUT',
-      Uri.parse('${ApiConfig.baseUrl}/device/resident/face'),
-    );
-    request.headers.addAll(_headers());
+    final request = http.MultipartRequest('PUT', Uri.parse('${ApiConfig.baseUrl}/devices/resident/face'));
+    final token = AuthService.jwt;
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
     request.files.add(await http.MultipartFile.fromPath('photo', photo.path));
-    final streamed = await request.send();
-    final response = await http.Response.fromStream(streamed);
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
     if (response.statusCode != 200) {
-      throw Exception(response.body);
+      throw Exception(_responseError(response, 'No se pudo actualizar el reconocimiento facial.'));
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic> || decoded['success'] != true) {
+      throw Exception('El servidor no confirmó la actualización del reconocimiento facial.');
+    }
+  }
+
+  static Future<void> deleteResidentFace() async {
+    final response = await http.delete(Uri.parse('${ApiConfig.baseUrl}/devices/resident/face'), headers: _headers());
+    if (response.statusCode != 200) {
+      throw Exception(_responseError(response, 'No se pudo eliminar el reconocimiento facial.'));
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic> || decoded['success'] != true) {
+      throw Exception('El servidor no confirmó la eliminación del reconocimiento facial.');
     }
   }
 
   static Future<void> updateDynamicCode(String code) async {
-    final res = await http.put(
-      Uri.parse('${ApiConfig.baseUrl}/device/resident/dynamic-code'),
-      headers: _headers(),
-      body: jsonEncode({'dynamicCode': code}),
-    );
-    debugPrint('updateDynamicCode: ${res}');
-    if (res.statusCode != 200) {
-      throw Exception(res.body);
+    final response = await http.put(Uri.parse('${ApiConfig.baseUrl}/devices/resident/dynamic-code'), headers: _headers(), body: jsonEncode({'dynamicCode': code}));
+    if (response.statusCode != 200) {
+      throw Exception(_responseError(response, 'No se pudo actualizar el código dinámico.'));
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic> || decoded['success'] != true) {
+      throw Exception('El servidor no confirmó la actualización del código dinámico.');
     }
   }
 
   static Map<String, String> _headers() {
     final token = AuthService.jwt;
-    return {
-      'Content-Type': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
+    return {'Content-Type': 'application/json', if (token != null) 'Authorization': 'Bearer $token'};
+  }
+
+  static String _responseError(http.Response response, String fallback) {
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded['error']?.toString() ?? fallback;
+      }
+    } catch (_) {}
+    return fallback;
   }
 }
