@@ -9,6 +9,10 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    - local_plugins/twilio_voice_vohk/twilio_voice-0.3.2+2/example/**
+
 formatter:
   page_width: 175
   trailing_commas: automate

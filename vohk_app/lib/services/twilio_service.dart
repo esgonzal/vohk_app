@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:twilio_voice/twilio_voice.dart';
 import 'api_config.dart';
+import 'package:flutter/foundation.dart';
 
 class TwilioService {
   static bool callScreenOpen = false;
@@ -12,7 +12,24 @@ class TwilioService {
   static StreamSubscription? _callSubscription;
   static bool get initialized => _initialized;
 
-  static Future<void> initialize({required String jwt, required String identity, required String deviceToken}) async {
+  static String get _twilioPlatform {
+    if (Platform.isAndroid) {
+      return 'android';
+    }
+    if (Platform.isIOS) {
+      return 'ios';
+    }
+    throw UnsupportedError('Twilio Voice is only supported on Android and iOS.');
+  }
+
+  static String? get _twilioEnvironment {
+    if (!Platform.isIOS) {
+      return null;
+    }
+    return kReleaseMode ? 'production' : 'sandbox';
+  }
+
+  static Future<void> initialize({required String jwt, required String identity, String? deviceToken}) async {
     if (_initialized) return;
     if (jwt.isEmpty) {
       throw Exception('Missing authentication token.');
@@ -49,7 +66,13 @@ class TwilioService {
   }
 
   static Future<String> _fetchAccessToken(String jwt) async {
-    final response = await http.get(Uri.parse('${ApiConfig.baseUrl}/auth/token'), headers: {'Authorization': 'Bearer $jwt'});
+    final queryParameters = <String, String>{'platform': _twilioPlatform};
+    final environment = _twilioEnvironment;
+    if (environment != null) {
+      queryParameters['environment'] = environment;
+    }
+    final uri = Uri.parse('${ApiConfig.baseUrl}/auth/token').replace(queryParameters: queryParameters);
+    final response = await http.get(uri, headers: {'Authorization': 'Bearer $jwt'});
     if (response.statusCode != 200) {
       throw Exception('Unable to obtain Twilio token: ${response.statusCode} ${response.body}');
     }
@@ -64,9 +87,12 @@ class TwilioService {
     return accessToken;
   }
 
-  static Future<void> _registerDevice({required String jwt, required String deviceToken}) async {
+  static Future<void> _registerDevice({required String jwt, String? deviceToken}) async {
+    if (Platform.isAndroid && (deviceToken == null || deviceToken.isEmpty)) {
+      throw Exception('Android requires an FCM token for Twilio registration.');
+    }
     final accessToken = await _fetchAccessToken(jwt);
-    final result = await TwilioVoice.instance.setTokens(accessToken: accessToken, deviceToken: deviceToken);
+    final result = await TwilioVoice.instance.setTokens(accessToken: accessToken, deviceToken: deviceToken ?? '');
     if (result == false) {
       throw Exception('Twilio rejected device registration.');
     }

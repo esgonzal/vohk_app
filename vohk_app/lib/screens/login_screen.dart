@@ -1,12 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:vohk_app/screens/main_shell.dart';
 import 'package:vohk_app/services/auth_service.dart';
-import 'package:vohk_app/services/twilio_service.dart';
 import 'package:vohk_app/services/notification_service.dart';
+import 'package:vohk_app/services/twilio_service.dart';
 import '../vohk_theme.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -44,20 +46,40 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       fcmToken = await NotificationService.requestPermissionAndGetToken();
       await AuthService.registerFcmToken(fcmToken);
+    } catch (error, stackTrace) {
+      debugPrint('Notification setup failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+    if (Platform.isAndroid && fcmToken == null) {
+      await AuthService.logout();
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Debe habilitar las notificaciones para recibir llamadas en este dispositivo.';
+      });
+      return;
+    }
+    try {
       await TwilioService.initialize(jwt: AuthService.jwt!, identity: AuthService.identity!, deviceToken: fcmToken);
     } catch (error, stackTrace) {
-      debugPrint('Login device setup failed: $error');
+      debugPrint('Twilio device setup failed: $error');
       debugPrintStack(stackTrace: stackTrace);
       try {
         if (AuthService.jwt != null) {
           await TwilioService.unregister(jwt: AuthService.jwt!);
         }
-      } catch (_) {}
+      } catch (cleanupError, cleanupStackTrace) {
+        debugPrint('Twilio cleanup failed: $cleanupError');
+        debugPrintStack(stackTrace: cleanupStackTrace);
+      }
       try {
         if (fcmToken != null) {
           await AuthService.unregisterFcmToken(fcmToken);
         }
-      } catch (_) {}
+      } catch (cleanupError, cleanupStackTrace) {
+        debugPrint('FCM cleanup failed: $cleanupError');
+        debugPrintStack(stackTrace: cleanupStackTrace);
+      }
       await TwilioService.dispose();
       await AuthService.logout();
       if (!mounted) return;
@@ -80,9 +102,9 @@ class _LoginScreenState extends State<LoginScreen> {
       await AuthService.forgotPassword(email);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Si el correo existe, recibirás instrucciones para cambiar tu contraseña.')));
-    } catch (e) {
+    } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $error')));
     }
   }
 
@@ -160,7 +182,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       const Icon(Icons.error_outline, color: VohkColors.error, size: 16),
                       const SizedBox(width: 6),
-                      Text(_error!, style: const TextStyle(color: VohkColors.error, fontSize: 13)),
+                      Expanded(
+                        child: Text(_error!, style: const TextStyle(color: VohkColors.error, fontSize: 13)),
+                      ),
                     ],
                   ),
                 ],
@@ -220,5 +244,6 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
     );
+    emailController.dispose();
   }
 }

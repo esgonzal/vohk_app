@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Vohk App</string>
+	<string>Vöhk Comunidades</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>vohk_app</string>
+	<string>Vöhk Comunidades</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -45,7 +45,15 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Vöhk Comunidades usa la cámara para registrar o actualizar el reconocimiento facial.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Needed for intercom audio calls</string>
+	<string>Vöhk Comunidades usa el micrófono para hablar durante las llamadas de citofonía.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>remote-notification</string>
+		<string>voip</string>
+	</array>
 </dict>
 </plist>

@@ -108,31 +108,29 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     public func handle(_ flutterCall: FlutterMethodCall, result: @escaping FlutterResult) {
         _result = result
-        
         let arguments:Dictionary<String, AnyObject> = flutterCall.arguments as! Dictionary<String, AnyObject>;
-        
         if flutterCall.method == "tokens" {
-            guard let token = arguments["accessToken"] as? String else {
-                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing accessToken", details: nil))
-                return
-            }
-            self.accessToken = token;
-            guard let deviceToken = deviceToken else {
-                self.sendPhoneCallEvents(description: "LOG|Device token is nil. Cannot register for VoIP push notifications.", isError: true)
-                return
-            }
-            if let token = accessToken {
-                self.sendPhoneCallEvents(description: "LOG|pushRegistry:attempting to register with twilio", isError: false)
-                TwilioVoiceSDK.register(accessToken: token, deviceToken: deviceToken) { (error) in
-                    if let error = error {
-                        self.sendPhoneCallEvents(description: "LOG|An error occurred while registering: \(error.localizedDescription)", isError: false)
-                    }
-                    else {
-                        self.sendPhoneCallEvents(description: "LOG|Successfully registered for VoIP push notifications.", isError: false)
+                guard let token = arguments["accessToken"] as? String else {
+                    result(FlutterError(code: "INVALID_ARGUMENTS",message: "Missing accessToken",details: nil))
+                    return
+                }
+                self.accessToken = token
+                guard let deviceToken = deviceToken else {
+                    self.sendPhoneCallEvents(description: "LOG|VoIP token is not ready. Registration will continue when PushKit provides it.",isError: false)
+                    result(true)
+                    return
+                }
+                TwilioVoiceSDK.register(accessToken: token,deviceToken: deviceToken) { error in
+                    DispatchQueue.main.async {
+                        if let error = error {
+                            result(FlutterError(code: "TWILIO_REGISTRATION_FAILED",message: error.localizedDescription,details: nil))
+                            return
+                        }
+                        self.sendPhoneCallEvents(description: "LOG|Successfully registered for VoIP push notifications.",isError: false)
+                        result(true)
                     }
                 }
-            }
-        } else if flutterCall.method == "makeCall" {
+            } else if flutterCall.method == "makeCall" {
             guard let callTo = arguments["To"] as? String else {return}
             guard let callFrom = arguments["From"] as? String else {return}
             self.callArgs = arguments
