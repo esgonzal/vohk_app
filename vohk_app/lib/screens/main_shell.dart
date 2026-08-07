@@ -175,11 +175,11 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<void> _changeUsername() async {
-    final controller = TextEditingController(text: AuthService.username);
-    final username = await _showSingleInputDialog(title: 'Cambiar nombre de usuario', label: 'Nuevo nombre de usuario', controller: controller);
-    controller.dispose();
+    final username = await _showSingleInputDialog(title: 'Cambiar nombre de usuario', label: 'Nuevo nombre de usuario', initialValue: AuthService.username ?? '');
     final value = username?.trim();
-    if (value == null || value.isEmpty || value == AuthService.username) return;
+    if (value == null || value.isEmpty || value == AuthService.username) {
+      return;
+    }
     try {
       final updatedUsername = await VohkApi.updateUsername(value);
       await AuthService.updateCachedUsername(updatedUsername);
@@ -193,16 +193,11 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<void> _changeEmail() async {
-    final controller = TextEditingController(text: AuthService.email);
-    final email = await _showSingleInputDialog(
-      title: 'Cambiar correo electrónico',
-      label: 'Nuevo correo electrónico',
-      controller: controller,
-      keyboardType: TextInputType.emailAddress,
-    );
-    controller.dispose();
+    final email = await _showSingleInputDialog(title: 'Cambiar correo electrónico', label: 'Nuevo correo electrónico', initialValue: AuthService.email ?? '');
     final value = email?.trim().toLowerCase();
-    if (value == null || value.isEmpty || value == AuthService.email) return;
+    if (value == null || value.isEmpty || value == AuthService.email) {
+      return;
+    }
     if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ingresa un correo electrónico válido.')));
@@ -335,105 +330,165 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
-  Future<String?> _showSingleInputDialog({
-    required String title,
-    required String label,
-    required TextEditingController controller,
-    TextInputType keyboardType = TextInputType.text,
-  }) {
+  Future<String?> _showSingleInputDialog({required String title, required String label, String initialValue = ''}) async {
+    String value = initialValue;
+
     return showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          keyboardType: keyboardType,
-          autofocus: true,
-          decoration: InputDecoration(labelText: label),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: const Text('Guardar')),
-        ],
-      ),
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(title),
+          content: TextFormField(
+            initialValue: initialValue,
+            autofocus: true,
+            decoration: InputDecoration(labelText: label),
+            textInputAction: TextInputAction.done,
+            onChanged: (newValue) {
+              value = newValue;
+            },
+            onFieldSubmitted: (submittedValue) {
+              Navigator.of(dialogContext).pop(submittedValue);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(value);
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        );
+      },
     );
   }
 
   Future<(String, String)?> _showPasswordDialog() async {
-    final currentController = TextEditingController();
-    final newController = TextEditingController();
-    final confirmationController = TextEditingController();
+    String currentPassword = '';
+    String newPassword = '';
+    String confirmation = '';
     String? validationError;
-    final result = await showDialog<(String, String)>(
+    return showDialog<(String, String)>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Cambiar contraseña'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: currentController,
-                obscureText: true,
-                enableSuggestions: false,
-                autocorrect: false,
-                textInputAction: TextInputAction.next,
-                autofillHints: const [AutofillHints.password],
-                decoration: const InputDecoration(labelText: 'Contraseña actual'),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: newController,
-                obscureText: true,
-                enableSuggestions: false,
-                autocorrect: false,
-                textInputAction: TextInputAction.next,
-                autofillHints: const [AutofillHints.newPassword],
-                decoration: const InputDecoration(labelText: 'Nueva contraseña'),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: confirmationController,
-                obscureText: true,
-                enableSuggestions: false,
-                autocorrect: false,
-                textInputAction: TextInputAction.done,
-                autofillHints: const [AutofillHints.newPassword],
-                decoration: const InputDecoration(labelText: 'Confirmar nueva contraseña'),
-              ),
-              if (validationError != null) ...[
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(validationError!, style: const TextStyle(color: VohkColors.error, fontSize: 12)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  obscureText: true,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.password],
+                  decoration: const InputDecoration(labelText: 'Contraseña actual'),
+                  onChanged: (value) {
+                    currentPassword = value;
+                  },
                 ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  obscureText: true,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.newPassword],
+                  decoration: const InputDecoration(labelText: 'Nueva contraseña'),
+                  onChanged: (value) {
+                    newPassword = value;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  obscureText: true,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  textInputAction: TextInputAction.done,
+                  autofillHints: const [AutofillHints.newPassword],
+                  decoration: const InputDecoration(labelText: 'Confirmar nueva contraseña'),
+                  onChanged: (value) {
+                    confirmation = value;
+                  },
+                  onFieldSubmitted: (_) {
+                    if (currentPassword.isEmpty || newPassword.isEmpty || confirmation.isEmpty) {
+                      setDialogState(() {
+                        validationError = 'Completa todos los campos.';
+                      });
+                      return;
+                    }
+                    if (newPassword.length < 8) {
+                      setDialogState(() {
+                        validationError = 'La nueva contraseña debe tener al menos 8 caracteres.';
+                      });
+                      return;
+                    }
+                    if (newPassword == currentPassword) {
+                      setDialogState(() {
+                        validationError = 'La nueva contraseña debe ser diferente a la actual.';
+                      });
+                      return;
+                    }
+                    if (newPassword != confirmation) {
+                      setDialogState(() {
+                        validationError = 'Las nuevas contraseñas no coinciden.';
+                      });
+                      return;
+                    }
+                    Navigator.of(dialogContext).pop((currentPassword, newPassword));
+                  },
+                ),
+                if (validationError != null) ...[
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(validationError!, style: const TextStyle(color: VohkColors.error, fontSize: 12)),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancelar')),
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Cancelar'),
+            ),
             FilledButton(
               onPressed: () {
-                final currentPassword = currentController.text;
-                final newPassword = newController.text;
-                final confirmation = confirmationController.text;
                 if (currentPassword.isEmpty || newPassword.isEmpty || confirmation.isEmpty) {
-                  setDialogState(() => validationError = 'Completa todos los campos.');
+                  setDialogState(() {
+                    validationError = 'Completa todos los campos.';
+                  });
                   return;
                 }
                 if (newPassword.length < 8) {
-                  setDialogState(() => validationError = 'La nueva contraseña debe tener al menos 8 caracteres.');
+                  setDialogState(() {
+                    validationError = 'La nueva contraseña debe tener al menos 8 caracteres.';
+                  });
                   return;
                 }
                 if (newPassword == currentPassword) {
-                  setDialogState(() => validationError = 'La nueva contraseña debe ser diferente a la actual.');
+                  setDialogState(() {
+                    validationError = 'La nueva contraseña debe ser diferente a la actual.';
+                  });
                   return;
                 }
                 if (newPassword != confirmation) {
-                  setDialogState(() => validationError = 'Las nuevas contraseñas no coinciden.');
+                  setDialogState(() {
+                    validationError = 'Las nuevas contraseñas no coinciden.';
+                  });
                   return;
                 }
-                Navigator.pop(dialogContext, (currentPassword, newPassword));
+                Navigator.of(dialogContext).pop((currentPassword, newPassword));
               },
               child: const Text('Guardar'),
             ),
@@ -441,10 +496,6 @@ class _MainShellState extends State<MainShell> {
         ),
       ),
     );
-    currentController.dispose();
-    newController.dispose();
-    confirmationController.dispose();
-    return result;
   }
 
   Future<String?> _showDynamicCodeDialog() async {

@@ -215,10 +215,10 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _showForgotPasswordDialog() async {
-    final emailController = TextEditingController();
-    await showDialog(
+    String email = '';
+    final result = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Recuperar contraseña'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -226,24 +226,25 @@ class _LoginScreenState extends State<LoginScreen> {
             const Text('Ingrese el correo asociado a su cuenta.'),
             const SizedBox(height: 16),
             TextField(
-              controller: emailController,
               keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(labelText: 'Correo electrónico'),
+              onChanged: (value) => email = value,
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancelar')),
           ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _forgotPassword(emailController.text.trim());
+            onPressed: () {
+              FocusScope.of(dialogContext).unfocus();
+              Navigator.pop(dialogContext, email.trim());
             },
             child: const Text('Enviar'),
           ),
         ],
       ),
     );
-    emailController.dispose();
+    if (result == null || result.isEmpty) return;
+    await _forgotPassword(result);
   }
 }

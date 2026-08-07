@@ -14,6 +14,7 @@ class _LiveCameraViewState extends State<LiveCameraView> {
   final RTCVideoRenderer _renderer = RTCVideoRenderer();
   RTCPeerConnection? _pc;
   bool loadingVideo = true;
+
   @override
   void initState() {
     super.initState();
