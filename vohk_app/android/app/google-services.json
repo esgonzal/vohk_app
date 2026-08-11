@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:280179720983:android:9236cc39c559fe49036d52",
+        "android_client_info": {
+          "package_name": "cl.vohk.comunidades"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDZNS2qzaxp58tk0Ujv88_yzzBP9HZlyT4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:280179720983:android:fcfc245777db9e88036d52",
         "android_client_info": {
           "package_name": "cl.vohk.vohk_app"
