@@ -279,15 +279,27 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
         else if flutterCall.method == "unregister" {
             guard let deviceToken = deviceToken else {
+                result(true)
                 return
             }
-            if let token = arguments["accessToken"] as? String{
-                self.unregisterTokens(token: token, deviceToken: deviceToken)
-            }else if let token = accessToken{
-                self.unregisterTokens(token: token, deviceToken: deviceToken)
+            let token = arguments["accessToken"] as? String ?? accessToken
+            guard let token = token, !token.isEmpty else {
+                result(FlutterError(code: "MISSING_ACCESS_TOKEN",message: "Missing access token for Twilio unregistration.",details: nil))
+                return
             }
-            
-        }else if flutterCall.method == "hangUp"{
+            TwilioVoiceSDK.unregister(accessToken: token,deviceToken: deviceToken) { error in
+                DispatchQueue.main.async {
+                    if let error = error {
+                        self.sendPhoneCallEvents(description: "LOG|An error occurred while unregistering: \(error.localizedDescription)",isError: false)
+                        result(FlutterError(code: "TWILIO_UNREGISTRATION_FAILED",message: error.localizedDescription,details: nil))
+                        return
+                    }
+                    self.accessToken = nil
+                    self.sendPhoneCallEvents(description: "LOG|Successfully unregistered from VoIP push notifications.",isError: false)
+                    result(true)
+                }
+            }
+        } else if flutterCall.method == "hangUp"{
             // Hang up on-going/active call
             if (self.call != nil) {
                 self.sendPhoneCallEvents(description: "LOG|hangUp method invoked", isError: false)

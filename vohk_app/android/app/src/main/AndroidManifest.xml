@@ -18,22 +18,18 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <application
         android:name="${applicationName}"
-        android:label="vohk_app"
+        android:label="Vöhk Comunidades"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
-
         <!-- TWILIO FIREBASE SERVICE  -->
         <service
             android:name="com.twilio.twilio_voice.fcm.VoiceFirebaseMessagingService"
             android:exported="false"
             android:stopWithTask="false">
-
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT"/>
             </intent-filter>
-
         </service>
-       
         <!-- MAIN ACTIVITY -->
         <activity
             android:name=".MainActivity"
@@ -46,27 +42,21 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-
             <!-- NORMAL THEME -->
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme"/>
-
             <!-- LAUNCHER -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-
         </activity>
-
         <!-- FLUTTER -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2"/>
-
     </application>
-
     <!-- FLUTTER TEXT PROCESSING -->
     <queries>
         <intent>
@@ -74,5 +64,4 @@
             <data android:mimeType="text/plain"/>
         </intent>
     </queries>
-
 </manifest>

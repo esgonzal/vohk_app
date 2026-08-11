@@ -8,6 +8,7 @@ import 'package:vohk_app/services/notification_service.dart';
 import 'package:vohk_app/services/twilio_service.dart';
 import 'screens/login_screen.dart';
 import 'package:vohk_app/services/incoming_call_service.dart';
+import 'dart:io';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 StreamSubscription<String>? _tokenRefreshSubscription;
@@ -22,22 +23,36 @@ Future<void> main() async {
   if (hasSession) {
     String? fcmToken;
     try {
-      fcmToken = await NotificationService.requestPermissionAndGetToken();
-      await AuthService.registerFcmToken(fcmToken);
+      try {
+        fcmToken = await NotificationService.requestPermissionAndGetToken();
+        await AuthService.registerFcmToken(fcmToken);
+      } catch (error, stackTrace) {
+        debugPrint('Saved-session notification setup failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        if (Platform.isAndroid) {
+          rethrow;
+        }
+      }
       await TwilioService.initialize(jwt: AuthService.jwt!, identity: AuthService.identity!, deviceToken: fcmToken);
     } catch (error, stackTrace) {
-      debugPrint('Saved-session initialization failed: $error');
+      debugPrint('Saved-session device initialization failed: $error');
       debugPrintStack(stackTrace: stackTrace);
       try {
         if (AuthService.jwt != null) {
           await TwilioService.unregister(jwt: AuthService.jwt!);
         }
-      } catch (_) {}
+      } catch (cleanupError, cleanupStackTrace) {
+        debugPrint('Twilio cleanup failed: $cleanupError');
+        debugPrintStack(stackTrace: cleanupStackTrace);
+      }
       try {
         if (fcmToken != null) {
           await AuthService.unregisterFcmToken(fcmToken);
         }
-      } catch (_) {}
+      } catch (cleanupError, cleanupStackTrace) {
+        debugPrint('FCM cleanup failed: $cleanupError');
+        debugPrintStack(stackTrace: cleanupStackTrace);
+      }
       await TwilioService.dispose();
       await AuthService.logout();
       hasSession = false;
@@ -54,7 +69,7 @@ Future<void> _handleFcmTokenRefresh(String newToken) async {
   }
   try {
     await AuthService.registerFcmToken(newToken);
-    if (TwilioService.initialized) {
+    if (Platform.isAndroid && TwilioService.initialized) {
       await TwilioService.refreshDeviceRegistration(jwt: jwt, deviceToken: newToken);
     }
   } catch (error, stackTrace) {
@@ -71,7 +86,7 @@ class VohkApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: 'Vohk Porteria',
+      title: 'Vöhk Comunidades',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
       home: hasSession ? const MainShell() : const LoginScreen(),
