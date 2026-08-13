@@ -8,7 +8,7 @@ import 'auth_service.dart';
 import 'vohk_api.dart';
 
 class IncomingCallService {
-  static const MethodChannel _channel = MethodChannel('cl.vohk.vohk_app/incoming_call');
+  static const MethodChannel _channel = MethodChannel('cl.vohk.comunidades/incoming_call');
   static late GlobalKey<NavigatorState> _navigatorKey;
   static bool _initialized = false;
   static bool _openingScreen = false;

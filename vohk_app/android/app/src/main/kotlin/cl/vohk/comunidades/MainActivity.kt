@@ -1,5 +1,4 @@
-package cl.vohk.vohk_app
-
+package cl.vohk.comunidades
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -10,10 +9,10 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-
+    
     companion object {
         private const val TAG = "VohkMainActivity"
-        private const val CHANNEL = "cl.vohk.vohk_app/incoming_call"
+        private const val CHANNEL = "cl.vohk.comunidades/incoming_call"
         private const val METHOD_CONSUME_PENDING =
             "consumePendingIncomingCall"
         private const val METHOD_INCOMING_CALL_OPENED =
