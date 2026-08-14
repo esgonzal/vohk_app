@@ -43,21 +43,23 @@ class _LoginScreenState extends State<LoginScreen> {
       });
       return;
     }
-    try {
-      fcmToken = await NotificationService.requestPermissionAndGetToken();
-      await AuthService.registerFcmToken(fcmToken);
-    } catch (error, stackTrace) {
-      debugPrint('Notification setup failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-    }
-    if (Platform.isAndroid && fcmToken == null) {
-      await AuthService.logout();
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = 'Debe habilitar las notificaciones para recibir llamadas en este dispositivo.';
-      });
-      return;
+    if (Platform.isAndroid) {
+      try {
+        fcmToken = await NotificationService.requestPermissionAndGetToken();
+        await AuthService.registerFcmToken(fcmToken);
+      } catch (error, stackTrace) {
+        debugPrint('Android notification setup failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+      if (fcmToken == null) {
+        await AuthService.logout();
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _error = 'Debe habilitar las notificaciones para recibir llamadas en este dispositivo.';
+        });
+        return;
+      }
     }
     try {
       await TwilioService.initialize(jwt: AuthService.jwt!, identity: AuthService.identity!, deviceToken: fcmToken);
@@ -72,13 +74,13 @@ class _LoginScreenState extends State<LoginScreen> {
         debugPrint('Twilio cleanup failed: $cleanupError');
         debugPrintStack(stackTrace: cleanupStackTrace);
       }
-      try {
-        if (fcmToken != null) {
+      if (Platform.isAndroid && fcmToken != null) {
+        try {
           await AuthService.unregisterFcmToken(fcmToken);
+        } catch (cleanupError, cleanupStackTrace) {
+          debugPrint('FCM cleanup failed: $cleanupError');
+          debugPrintStack(stackTrace: cleanupStackTrace);
         }
-      } catch (cleanupError, cleanupStackTrace) {
-        debugPrint('FCM cleanup failed: $cleanupError');
-        debugPrintStack(stackTrace: cleanupStackTrace);
       }
       await TwilioService.dispose();
       await AuthService.logout();

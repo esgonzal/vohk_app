@@ -1,8 +1,6 @@
-import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:twilio_voice/twilio_voice.dart';
 import 'package:vohk_app/screens/cameras_screen.dart';
 import 'package:vohk_app/screens/home_screen.dart';
 import 'package:vohk_app/screens/intercoms_screen.dart';
@@ -24,11 +22,8 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
-  bool _isRinging = false;
-  bool _inCall = false;
   bool _locationsLoaded = false;
   int _locationLoadGeneration = 0;
-  StreamSubscription? _twilioSub;
   List<Map<String, dynamic>> _locations = [];
   Map<String, dynamic>? _currentLocation;
   bool get _isResident => AuthService.role == 'resident';
@@ -77,37 +72,7 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
-    _listenToCallEvents();
     _loadLocations();
-  }
-
-  @override
-  void dispose() {
-    _twilioSub?.cancel();
-    super.dispose();
-  }
-
-  void _listenToCallEvents() {
-    _twilioSub = TwilioVoice.instance.callEventsListener.listen((event) {
-      if (!mounted) return;
-      final text = event.toString().toLowerCase();
-      if (text.contains('ringing')) {
-        setState(() {
-          _isRinging = true;
-          _inCall = false;
-        });
-      } else if (text.contains('connected')) {
-        setState(() {
-          _isRinging = false;
-          _inCall = true;
-        });
-      } else if (text.contains('disconnected') || text.contains('ended')) {
-        setState(() {
-          _isRinging = false;
-          _inCall = false;
-        });
-      }
-    });
   }
 
   Future<void> _loadLocations() async {
@@ -153,16 +118,29 @@ class _MainShellState extends State<MainShell> {
 
   Future<void> _logout() async {
     final jwt = AuthService.jwt;
-    final fcmToken = await NotificationService.getToken();
+    String? fcmToken;
+    if (Platform.isAndroid) {
+      try {
+        fcmToken = await NotificationService.getToken().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () {
+            debugPrint('Timed out getting Android FCM token during logout.');
+            return null;
+          },
+        );
+      } catch (error) {
+        debugPrint('Could not get Android FCM token during logout: $error');
+      }
+    }
     if (jwt != null && jwt.isNotEmpty) {
       try {
-        await TwilioService.unregister(jwt: jwt);
+        await TwilioService.unregister(jwt: jwt).timeout(const Duration(seconds: 5));
       } catch (error) {
         debugPrint('Twilio unregistration failed: $error');
       }
-      if (fcmToken != null && fcmToken.isNotEmpty) {
+      if (Platform.isAndroid && fcmToken != null && fcmToken.isNotEmpty) {
         try {
-          await AuthService.unregisterFcmToken(fcmToken);
+          await AuthService.unregisterFcmToken(fcmToken).timeout(const Duration(seconds: 3));
         } catch (error) {
           debugPrint('FCM unregistration failed: $error');
         }
@@ -171,6 +149,7 @@ class _MainShellState extends State<MainShell> {
     await TwilioService.dispose();
     await AuthService.logout();
     if (!mounted) return;
+
     Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
   }
 
@@ -499,36 +478,49 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<String?> _showDynamicCodeDialog() async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
+    String value = '';
+    return showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Código dinámico'),
-        content: TextField(
-          controller: controller,
+        content: TextFormField(
           autofocus: true,
           keyboardType: TextInputType.number,
           maxLength: 6,
           decoration: const InputDecoration(hintText: 'Ingrese 6 dígitos'),
+          onChanged: (newValue) {
+            value = newValue;
+          },
+          onFieldSubmitted: (submittedValue) {
+            final code = submittedValue.trim();
+            if (!RegExp(r'^\d{6}$').hasMatch(code)) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Debe ingresar exactamente 6 números')));
+              return;
+            }
+            Navigator.of(dialogContext).pop(code);
+          },
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+            },
+            child: const Text('Cancelar'),
+          ),
           FilledButton(
             onPressed: () {
-              final value = controller.text.trim();
-              if (!RegExp(r'^\d{6}$').hasMatch(value)) {
+              final code = value.trim();
+              if (!RegExp(r'^\d{6}$').hasMatch(code)) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Debe ingresar exactamente 6 números')));
                 return;
               }
-              Navigator.pop(context, value);
+              Navigator.of(dialogContext).pop(code);
             },
             child: const Text('Guardar'),
           ),
         ],
       ),
     );
-    controller.dispose();
-    return result;
   }
 
   String get _initials {
@@ -788,71 +780,6 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  void _onCallFabTap() {
-    if (_isRinging || _inCall) {
-      _showCallBottomSheet();
-    } else {
-      setState(() => _currentIndex = 1);
-    }
-  }
-
-  void _showCallBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: VohkColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(color: VohkColors.border, borderRadius: BorderRadius.circular(2)),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              _inCall ? 'Llamada activa' : 'Llamada entrante del portero',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: VohkColors.textPrimary),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                if (_isRinging) ...[
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        await TwilioVoice.instance.call.answer();
-                      },
-                      icon: const Icon(Icons.call, color: Colors.black),
-                      label: const Text('Contestar'),
-                      style: ElevatedButton.styleFrom(backgroundColor: VohkColors.callGreen, foregroundColor: Colors.white),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                ],
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      Navigator.pop(context);
-                      await TwilioVoice.instance.call.hangUp();
-                    },
-                    icon: const Icon(Icons.call_end, color: Colors.white),
-                    label: const Text('Colgar'),
-                    style: ElevatedButton.styleFrom(backgroundColor: VohkColors.error, foregroundColor: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -872,7 +799,6 @@ class _MainShellState extends State<MainShell> {
           ],
         ),
       ),
-      floatingActionButton: _CallFab(isRinging: _isRinging, inCall: _inCall, onTap: _onCallFabTap),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           border: Border(top: BorderSide(color: VohkColors.border)),
@@ -910,38 +836,4 @@ Widget _buildAccessTile({required IconData icon, required String title, required
             ],
           ),
   );
-}
-
-class _CallFab extends StatelessWidget {
-  final bool isRinging;
-  final bool inCall;
-  final VoidCallback onTap;
-
-  const _CallFab({required this.isRinging, required this.inCall, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    Color backgroundColor = VohkColors.callGreen;
-    IconData icon = Icons.call;
-
-    if (inCall) {
-      backgroundColor = VohkColors.error;
-      icon = Icons.call_end;
-    }
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          shape: BoxShape.circle,
-          boxShadow: [BoxShadow(color: backgroundColor.withOpacity(0.4), blurRadius: isRinging ? 16 : 8, spreadRadius: isRinging ? 4 : 0)],
-        ),
-        child: Icon(icon, color: Colors.white, size: 26),
-      ),
-    );
-  }
 }

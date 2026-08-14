@@ -16,7 +16,7 @@ import UIKit
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
 
     let channel = FlutterMethodChannel(
-      name: "cl.vohk.vohk_app/incoming_call",
+      name: "cl.vohk.comunidades/incoming_call",
       binaryMessenger: engineBridge.applicationRegistrar.messenger()
     )
 

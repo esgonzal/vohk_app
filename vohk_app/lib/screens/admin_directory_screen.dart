@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:twilio_voice/twilio_voice.dart';
 import 'package:vohk_app/services/auth_service.dart';
 import 'package:vohk_app/services/vohk_api.dart';
 import 'package:vohk_app/vohk_theme.dart';
+import 'package:vohk_app/screens/outgoing_call_screen.dart';
 
 class AdminDirectoryScreen extends StatefulWidget {
   final Map<String, dynamic>? currentCondominium;
@@ -77,16 +77,14 @@ class _AdminDirectoryScreenState extends State<AdminDirectoryScreen> {
       _showMessage('Este residente no tiene una identidad SIP.');
       return;
     }
+    final residentName = resident['legal_name']?.toString() ?? 'Residente';
     setState(() => _placingCall = true);
     try {
-      final placed = await TwilioVoice.instance.call.place(from: callerIdentity, to: residentIdentity);
-      if (!mounted) return;
-      if (placed != true) {
-        _showMessage('No se pudo iniciar la llamada.');
-      }
-    } catch (error) {
-      if (!mounted) return;
-      _showMessage(error.toString().replaceFirst('Exception: ', ''));
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => OutgoingCallScreen(callerIdentity: callerIdentity, recipientIdentity: residentIdentity, recipientName: residentName),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _placingCall = false);
