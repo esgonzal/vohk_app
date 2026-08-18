@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import '../vohk_theme.dart';
 
 class LiveCameraView extends StatefulWidget {
   final String streamUrl;
@@ -38,7 +39,12 @@ class _LiveCameraViewState extends State<LiveCameraView> {
       );
       _pc!.onTrack = (event) {
         if (event.streams.isNotEmpty) {
-          _renderer.srcObject = event.streams[0];
+          final stream = event.streams[0];
+          for (final audioTrack in stream.getAudioTracks()) {
+            audioTrack.enabled = false;
+            audioTrack.stop();
+          }
+          _renderer.srcObject = stream;
           if (mounted) {
             setState(() {
               loadingVideo = false;
@@ -67,18 +73,30 @@ class _LiveCameraViewState extends State<LiveCameraView> {
 
   @override
   void dispose() {
-    _renderer.dispose();
+    final stream = _renderer.srcObject;
+    if (stream != null) {
+      for (final track in stream.getTracks()) {
+        track.stop();
+      }
+    }
+    _renderer.srcObject = null;
     _pc?.close();
+    _pc = null;
+    _renderer.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        RTCVideoView(_renderer, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain),
-        if (loadingVideo) const Center(child: CircularProgressIndicator()),
-      ],
+    return ColoredBox(
+      color: Colors.black,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          RTCVideoView(_renderer, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain),
+          if (loadingVideo) const Center(child: CircularProgressIndicator(color: VohkColors.accent)),
+        ],
+      ),
     );
   }
 }

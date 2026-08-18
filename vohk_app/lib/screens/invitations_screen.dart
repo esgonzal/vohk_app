@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vohk_app/services/vohk_api.dart';
+import '../vohk_theme.dart';
 
 class InvitationsScreen extends StatefulWidget {
   final Map<String, dynamic>? currentUnit;
@@ -399,83 +400,117 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
   Widget build(BuildContext context) {
     final hasUnit = widget.currentUnit != null;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Invitaciones'),
-        actions: [
-          IconButton(tooltip: 'Actualizar', icon: const Icon(Icons.refresh), onPressed: _loading || !hasUnit ? null : _refresh),
-          if (_creating)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
-            )
-          else
-            IconButton(tooltip: 'Nueva invitación', icon: const Icon(Icons.add), onPressed: _loading || !hasUnit ? null : _showCreateDialog),
-        ],
-      ),
-      body: !hasUnit
-          ? const Center(
-              child: Text('Selecciona una unidad.', style: TextStyle(color: Colors.grey)),
-            )
-          : _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _invitations.isEmpty
-          ? const Center(
-              child: Text('No tienes invitaciones.', style: TextStyle(color: Colors.grey)),
-            )
-          : RefreshIndicator(
-              onRefresh: _refresh,
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _invitations.length,
-                itemBuilder: (context, index) {
-                  final invitation = _invitations[index];
-                  final invitationId = invitation['invitation_id']?.toString() ?? '';
-                  final visitorName = invitation['visitor_name']?.toString() ?? 'Sin registrar';
-                  final status = _effectiveStatus(invitation);
-                  final beginTime = _formatStoredDate(invitation['valid_from']?.toString());
-                  final endTime = _formatStoredDate(invitation['valid_until']?.toString());
-                  final dynamicCode = invitation['dynamic_code']?.toString();
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(16)),
-                    child: ListTile(
-                      onLongPress: status == 'pending' && invitationId.isNotEmpty ? () => _copyInvitationLink(invitationId) : null,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      leading: CircleAvatar(
-                        backgroundColor: _statusColor(status).withOpacity(0.2),
-                        child: Icon(status == 'registered' || status == 'active' ? Icons.person : Icons.hourglass_empty, color: _statusColor(status)),
-                      ),
-                      title: Text(visitorName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 4),
-                          Text('$beginTime → $endTime', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                          const SizedBox(height: 4),
-                          Wrap(
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 8,
-                            runSpacing: 4,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(color: _statusColor(status).withOpacity(0.15), borderRadius: BorderRadius.circular(99)),
-                                child: Text(_statusLabel(status), style: TextStyle(color: _statusColor(status), fontSize: 11)),
-                              ),
-                              if (dynamicCode != null) Text('PIN: $dynamicCode', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                            ],
-                          ),
-                        ],
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red),
-                        onPressed: invitationId.isEmpty ? null : () => _confirmDelete(invitationId, visitorName),
-                      ),
-                    ),
-                  );
-                },
-              ),
+      backgroundColor: VohkColors.background,
+      body: RefreshIndicator(
+        color: VohkColors.accent,
+        backgroundColor: VohkColors.surface,
+        onRefresh: _refresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(24, 18, 24, 110),
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'INVITACIONES',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
+                ),
+                SizedBox(
+                  height: 38,
+                  child: ElevatedButton.icon(
+                    onPressed: _loading || !hasUnit || _creating ? null : _showCreateDialog,
+                    style: ElevatedButton.styleFrom(minimumSize: const Size(0, 38), padding: const EdgeInsets.symmetric(horizontal: 13)),
+                    icon: _creating
+                        ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                        : const Icon(Icons.add, size: 18),
+                    label: const Text('Nueva'),
+                  ),
+                ),
+              ],
             ),
+            const SizedBox(height: 14),
+            if (!hasUnit)
+              const _InvitationsEmpty('Selecciona una unidad.')
+            else if (_loading)
+              const Padding(
+                padding: EdgeInsets.only(top: 120),
+                child: Center(child: CircularProgressIndicator(color: VohkColors.accent)),
+              )
+            else if (_invitations.isEmpty)
+              const _InvitationsEmpty('No tienes invitaciones.')
+            else
+              ..._invitations.map((invitation) {
+                final invitationId = invitation['invitation_id']?.toString() ?? '';
+                final visitorName = invitation['visitor_name']?.toString() ?? 'Sin registrar';
+                final status = _effectiveStatus(invitation);
+                final beginTime = _formatStoredDate(invitation['valid_from']?.toString());
+                final endTime = _formatStoredDate(invitation['valid_until']?.toString());
+                final dynamicCode = invitation['dynamic_code']?.toString();
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: VohkColors.surface,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: VohkColors.border),
+                  ),
+                  child: ListTile(
+                    onLongPress: status == 'pending' && invitationId.isNotEmpty ? () => _copyInvitationLink(invitationId) : null,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    leading: CircleAvatar(
+                      backgroundColor: _statusColor(status).withOpacity(.15),
+                      child: Icon(status == 'registered' || status == 'active' ? Icons.person_outline : Icons.schedule_rounded, color: _statusColor(status), size: 20),
+                    ),
+                    title: Text(visitorName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 4),
+                        Text('$beginTime → $endTime', style: const TextStyle(color: VohkColors.textSecondary, fontSize: 11)),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(color: _statusColor(status).withOpacity(.13), borderRadius: BorderRadius.circular(99)),
+                              child: Text(
+                                _statusLabel(status),
+                                style: TextStyle(color: _statusColor(status), fontSize: 10, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            if (dynamicCode != null) Text('PIN: $dynamicCode', style: const TextStyle(color: VohkColors.textSecondary, fontSize: 11)),
+                          ],
+                        ),
+                      ],
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline, color: VohkColors.error),
+                      onPressed: invitationId.isEmpty ? null : () => _confirmDelete(invitationId, visitorName),
+                    ),
+                  ),
+                );
+              }),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InvitationsEmpty extends StatelessWidget {
+  final String message;
+  const _InvitationsEmpty(this.message);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 110),
+      child: Center(
+        child: Text(message, style: const TextStyle(color: VohkColors.textSecondary)),
+      ),
     );
   }
 }

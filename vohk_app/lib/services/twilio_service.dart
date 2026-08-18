@@ -133,6 +133,23 @@ class TwilioService {
     );
   }
 
+  static Future<void> callIntercom({required String deviceId, required String identity}) async {
+    if (!_initialized) {
+      throw Exception('Twilio no está inicializado.');
+    }
+    if (deviceId.isEmpty) {
+      throw Exception('El videoportero no tiene device_id.');
+    }
+    if (identity.isEmpty) {
+      throw Exception('El usuario no tiene identidad Twilio.');
+    }
+    final isOnCall = await TwilioVoice.instance.call.isOnCall();
+    if (isOnCall) {
+      throw Exception('Ya existe una llamada activa.');
+    }
+    await TwilioVoice.instance.call.place(to: 'intercom:$deviceId', from: identity);
+  }
+
   static Future<void> dispose() async {
     await _callSubscription?.cancel();
     _callSubscription = null;

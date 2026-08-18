@@ -20,9 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.currentUnit != null) {
-      _fetchIntercoms();
-    }
+    if (widget.currentUnit != null) _fetchIntercoms();
   }
 
   Future<void> _refresh() async {
@@ -34,9 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void didUpdateWidget(covariant HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.currentUnit?['unit_id'] != widget.currentUnit?['unit_id']) {
-      setState(() {
-        _loading = true;
-      });
+      setState(() => _loading = true);
       _fetchIntercoms();
     }
   }
@@ -48,7 +44,6 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _intercoms = data.where((d) => d['type'] == 'intercom').toList();
           _loading = false;
-          //debugPrint('Intercoms in Home Screen: $_intercoms');
         });
       }
     } catch (e) {
@@ -72,63 +67,66 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: VohkColors.background,
-      body: SafeArea(
-        child: RefreshIndicator(
-          color: VohkColors.accent,
-          backgroundColor: VohkColors.surface,
-          onRefresh: _refresh,
-          child: CustomScrollView(
-            slivers: [
-              const SliverToBoxAdapter(child: SizedBox(height: 8)),
-              SliverToBoxAdapter(child: _buildAccesos()),
-              const SliverToBoxAdapter(child: SizedBox(height: 100)),
-            ],
-          ),
+      body: RefreshIndicator(
+        color: VohkColors.accent,
+        backgroundColor: VohkColors.surface,
+        onRefresh: _refresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(24, 18, 24, 110),
+          children: [
+            const Text(
+              'ACCESOS FAVORITOS',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
+            ),
+            const SizedBox(height: 12),
+            _buildAccessCard(),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildAccesos() {
+  Widget _buildAccessCard() {
     if (_loading) {
-      return const Padding(
-        padding: EdgeInsets.all(32),
+      return const SizedBox(
+        height: 120,
         child: Center(child: CircularProgressIndicator(color: VohkColors.accent)),
       );
     }
     if (_intercoms.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: VohkColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: VohkColors.border),
-          ),
-          child: const Center(
-            child: Text('Sin accesos disponibles', style: TextStyle(color: VohkColors.textMuted)),
-          ),
+      return Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: VohkColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: VohkColors.border),
+        ),
+        child: const Center(
+          child: Text('Sin accesos disponibles', style: TextStyle(color: VohkColors.textSecondary)),
         ),
       );
     }
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: ListView.separated(
-        physics: const NeverScrollableScrollPhysics(),
-        shrinkWrap: true,
-        itemCount: _intercoms.length,
-        separatorBuilder: (_, _) => const Divider(height: 1, color: VohkColors.border),
-        itemBuilder: (context, index) {
+    return Container(
+      decoration: BoxDecoration(
+        color: VohkColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: VohkColors.border),
+      ),
+      child: Column(
+        children: List.generate(_intercoms.length, (index) {
           final intercom = _intercoms[index];
-          return _AccessRow(
-            intercom: intercom,
-            onOpen: () => _openDoor(intercom),
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => IntercomDetailScreen(intercom: intercom)));
-            },
+          return Column(
+            children: [
+              if (index > 0) const Divider(indent: 64),
+              _AccessRow(
+                intercom: intercom,
+                onOpen: () => _openDoor(intercom),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => IntercomDetailScreen(intercom: intercom))),
+              ),
+            ],
           );
-        },
+        }),
       ),
     );
   }
@@ -145,48 +143,49 @@ class _AccessRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = intercom['name']?.toString().trim().isNotEmpty == true ? intercom['name'].toString() : 'Acceso';
     final location = intercom['location']?.toString().trim();
-    return Material(
-      color: Colors.transparent,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       child: Row(
         children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(color: VohkColors.accentDim, borderRadius: BorderRadius.circular(13)),
+            child: const Icon(Icons.doorbell_outlined, color: VohkColors.accent, size: 22),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: InkWell(
               onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: VohkColors.textPrimary),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (location != null && location.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        location,
-                        style: const TextStyle(fontSize: 12, color: VohkColors.textMuted),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    location != null && location.isNotEmpty ? location : 'Videoportero',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: VohkColors.textSecondary),
+                  ),
+                ],
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          ElevatedButton(
-            onPressed: onOpen,
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(76, 38),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 80,
+            height: 40,
+            child: ElevatedButton(
+              onPressed: onOpen,
+              style: ElevatedButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(80, 40)),
+              child: const Text('Abrir'),
             ),
-            child: const Text('Abrir', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
           ),
         ],
       ),

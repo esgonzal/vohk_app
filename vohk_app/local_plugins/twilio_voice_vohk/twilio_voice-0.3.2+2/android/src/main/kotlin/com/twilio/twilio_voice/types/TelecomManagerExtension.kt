@@ -1,5 +1,6 @@
 package com.twilio.twilio_voice.types
 
+import android.Manifest
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
@@ -88,10 +89,25 @@ object TelecomManagerExtension {
      * @param ctx application context
      * @param name The name of the componentName Class (i.e. ConnectionService)
      */
-    @RequiresPermission(value = "android.permission.READ_PHONE_STATE")
+    @RequiresPermission(
+        allOf = [
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.READ_PHONE_NUMBERS,
+        ]
+    )
     fun TelecomManager.hasCallCapableAccount(ctx: Context, name: String): Boolean {
         if (!canReadPhoneState(ctx)) return false
-        return callCapablePhoneAccounts.any { it.componentName.className == name }
+        if (!canReadPhoneNumbers(ctx)) return false
+
+        // callCapablePhoneAccounts only contains accounts which Android exposes as
+        // user-enabled calling accounts. A CAPABILITY_SELF_MANAGED account can be
+        // registered and usable without appearing in that list (notably on Huawei
+        // devices). Check the exact account registered by this plugin instead.
+        val phoneAccountHandle = getPhoneAccountHandle(ctx)
+        if (phoneAccountHandle.componentName.className != name) return false
+
+        return getPhoneAccount(phoneAccountHandle)
+            ?.hasCapabilities(PhoneAccount.CAPABILITY_SELF_MANAGED) == true
     }
 
     /**

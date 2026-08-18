@@ -21,6 +21,7 @@ class MainActivity : FlutterActivity() {
 
     private var incomingCallChannel: MethodChannel? = null
     private var pendingIncomingCall: HashMap<String, String>? = null
+    private var pcmAudioPlayer: PcmAudioPlayer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,6 +54,13 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        pcmAudioPlayer = PcmAudioPlayer(this, flutterEngine.dartExecutor.binaryMessenger)
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        pcmAudioPlayer?.dispose()
+        pcmAudioPlayer = null
+        super.cleanUpFlutterEngine(flutterEngine)
     }
 
     override fun onNewIntent(intent: Intent) {

@@ -22,6 +22,9 @@ dependencies:
   wakelock_plus: ^1.2.8
   shared_preferences: ^2.5.3
   flutter_webrtc: ^1.4.1
+  flutter_sound: ^9.30.0
+  audio_session: ^0.2.4
+  logger: ^2.7.0
   image_picker: ^1.1.2
 
 dev_dependencies:
@@ -32,6 +35,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/
 
 flutter_launcher_icons:
   android: true

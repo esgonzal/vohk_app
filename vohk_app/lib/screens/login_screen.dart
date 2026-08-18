@@ -120,53 +120,34 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: VohkColors.background,
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28),
+            padding: const EdgeInsets.symmetric(horizontal: 36),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Center(
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(color: VohkColors.accentDim, borderRadius: BorderRadius.circular(24)),
-                    child: const Icon(Icons.apartment, size: 44, color: VohkColors.accent),
-                  ),
-                ),
-                const SizedBox(height: 28),
-                const Center(
-                  child: Text(
-                    'VÖHK',
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: VohkColors.textPrimary, letterSpacing: 2),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Center(
-                  child: Text('Portería inteligente', style: TextStyle(fontSize: 14, color: VohkColors.textSecondary)),
-                ),
-                const SizedBox(height: 48),
+                const SizedBox(height: 24),
+                Center(child: Image.asset('assets/images/vohk-wordmark.png', width: 190, fit: BoxFit.contain)),
                 const Text(
-                  'USUARIO',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: VohkColors.textMuted, letterSpacing: 1.2),
+                  'Portería inteligente',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 15, color: VohkColors.textSecondary),
                 ),
+                const SizedBox(height: 52),
+                const _FieldLabel('USUARIO'),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _usernameController,
                   style: const TextStyle(color: VohkColors.textPrimary),
                   decoration: const InputDecoration(
                     hintText: 'tu.usuario',
-                    prefixIcon: Icon(Icons.person_outline, color: VohkColors.textMuted),
+                    prefixIcon: Icon(Icons.person_outline, color: VohkColors.textSecondary),
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
-                  'CONTRASEÑA',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: VohkColors.textMuted, letterSpacing: 1.2),
-                ),
+                const _FieldLabel('CONTRASEÑA'),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _passwordController,
@@ -174,7 +155,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: const TextStyle(color: VohkColors.textPrimary),
                   decoration: const InputDecoration(
                     hintText: '••••••••',
-                    prefixIcon: Icon(Icons.lock_outline, color: VohkColors.textMuted),
+                    prefixIcon: Icon(Icons.lock_outline, color: VohkColors.textSecondary),
                   ),
                   onSubmitted: (_) => _login(),
                 ),
@@ -192,22 +173,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
                 const SizedBox(height: 32),
                 SizedBox(
-                  width: double.infinity,
+                  height: 52,
                   child: ElevatedButton(
                     onPressed: _loading ? null : _login,
                     child: _loading ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black)) : const Text('Ingresar'),
                   ),
                 ),
-                const SizedBox(height: 16),
-                Center(
-                  child: TextButton(
-                    onPressed: _loading ? null : _showForgotPasswordDialog,
-                    child: const Text(
-                      '¿Olvidaste tu contraseña?',
-                      style: TextStyle(color: VohkColors.accent, fontWeight: FontWeight.w600),
-                    ),
-                  ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _loading ? null : _showForgotPasswordDialog,
+                  child: const Text('¿Olvidaste tu contraseña?', style: TextStyle(fontWeight: FontWeight.w700)),
                 ),
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -221,6 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        backgroundColor: VohkColors.surface,
         title: const Text('Recuperar contraseña'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -249,4 +227,15 @@ class _LoginScreenState extends State<LoginScreen> {
     if (result == null || result.isEmpty) return;
     await _forgotPassword(result);
   }
+}
+
+class _FieldLabel extends StatelessWidget {
+  final String text;
+  const _FieldLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
+  );
 }

@@ -64,7 +64,7 @@ class _MainShellState extends State<MainShell> {
     return const [
       BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Inicio'),
       BottomNavigationBarItem(icon: Icon(Icons.door_front_door_outlined), activeIcon: Icon(Icons.door_front_door), label: 'Accesos'),
-      BottomNavigationBarItem(icon: Icon(Icons.groups_outlined), activeIcon: Icon(Icons.groups), label: 'Directorio'),
+      BottomNavigationBarItem(icon: Icon(Icons.groups_outlined), activeIcon: Icon(Icons.groups), label: 'Unidades'),
       BottomNavigationBarItem(icon: Icon(Icons.videocam_outlined), activeIcon: Icon(Icons.videocam), label: 'Cámaras'),
     ];
   }
@@ -311,7 +311,6 @@ class _MainShellState extends State<MainShell> {
 
   Future<String?> _showSingleInputDialog({required String title, required String label, String initialValue = ''}) async {
     String value = initialValue;
-
     return showDialog<String>(
       context: context,
       builder: (dialogContext) {
@@ -543,28 +542,29 @@ class _MainShellState extends State<MainShell> {
     showModalBottomSheet(
       context: context,
       backgroundColor: VohkColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       builder: (_) => SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            padding: const EdgeInsets.fromLTRB(22, 14, 22, 34),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Center(
                   child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(color: VohkColors.border, borderRadius: BorderRadius.circular(2)),
+                    width: 42,
+                    height: 5,
+                    decoration: BoxDecoration(color: const Color(0xFF444448), borderRadius: BorderRadius.circular(5)),
                   ),
                 ),
                 const SizedBox(height: 20),
                 Text(
                   _isResident ? 'TUS PROPIEDADES' : 'TUS CONDOMINIOS',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: VohkColors.textMuted, letterSpacing: 1.2),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 ..._locations.map((location) {
                   final selected = location[locationKey]?.toString() == _currentLocation?[locationKey]?.toString();
                   final title = _isResident
@@ -573,19 +573,30 @@ class _MainShellState extends State<MainShell> {
                   final subtitle = _isResident
                       ? '${location['unit_name'] ?? ''} · Piso ${location['floor'] ?? ''} · ${location['room_no'] ?? ''}'
                       : '${location['address'] ?? ''} · ${location['city'] ?? ''}';
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(_isResident ? Icons.apartment : Icons.location_city, color: selected ? VohkColors.accent : VohkColors.textSecondary),
-                    title: Text(
-                      title,
-                      style: TextStyle(color: VohkColors.textPrimary, fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
+                  return Container(
+                    decoration: const BoxDecoration(
+                      border: Border(bottom: BorderSide(color: VohkColors.border)),
                     ),
-                    subtitle: Text(subtitle, style: const TextStyle(color: VohkColors.textSecondary)),
-                    trailing: selected ? const Icon(Icons.check_circle, color: VohkColors.accent) : null,
-                    onTap: () {
-                      Navigator.pop(context);
-                      _selectLocation(location);
-                    },
+                    child: ListTile(
+                      minTileHeight: 68,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 2),
+                      leading: Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(color: selected ? VohkColors.accentDim : const Color(0xFF242426), borderRadius: BorderRadius.circular(13)),
+                        child: Icon(_isResident ? Icons.apartment_outlined : Icons.location_city_outlined, color: selected ? VohkColors.accent : VohkColors.textSecondary),
+                      ),
+                      title: Text(
+                        title,
+                        style: TextStyle(color: VohkColors.textPrimary, fontSize: 16, fontWeight: selected ? FontWeight.w700 : FontWeight.w600),
+                      ),
+                      subtitle: Text(subtitle, style: const TextStyle(color: VohkColors.textSecondary, fontSize: 12)),
+                      trailing: selected ? const Icon(Icons.check_circle, color: VohkColors.accent, size: 22) : null,
+                      onTap: () {
+                        Navigator.pop(context);
+                        _selectLocation(location);
+                      },
+                    ),
                   );
                 }),
               ],
@@ -600,113 +611,111 @@ class _MainShellState extends State<MainShell> {
     showModalBottomSheet(
       context: context,
       backgroundColor: VohkColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       builder: (_) => SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(22, 14, 22, 34),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(color: VohkColors.border, borderRadius: BorderRadius.circular(2)),
+                  width: 42,
+                  height: 5,
+                  decoration: BoxDecoration(color: const Color(0xFF444448), borderRadius: BorderRadius.circular(5)),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 22),
                 Container(
-                  width: 64,
-                  height: 64,
+                  width: 84,
+                  height: 84,
                   decoration: BoxDecoration(
                     color: VohkColors.accentDim,
                     shape: BoxShape.circle,
-                    border: Border.all(color: VohkColors.accent, width: 2),
+                    border: Border.all(color: VohkColors.accent, width: 1.5),
                   ),
                   child: Center(
                     child: Text(
                       _initials,
-                      style: const TextStyle(color: VohkColors.accent, fontWeight: FontWeight.w700, fontSize: 22),
+                      style: const TextStyle(color: VohkColors.accent, fontWeight: FontWeight.w700, fontSize: 28),
                     ),
                   ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   AuthService.username ?? 'Usuario',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: VohkColors.textPrimary),
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: VohkColors.textPrimary),
                 ),
                 const SizedBox(height: 24),
-                const Divider(),
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Cuenta',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: VohkColors.textSecondary),
+                    'CUENTA',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
                   ),
                 ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.person_outline),
-                  title: const Text('Cambiar nombre de usuario'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _changeUsername();
-                  },
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.alternate_email),
-                  title: const Text('Cambiar correo electrónico'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _changeEmail();
-                  },
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.lock_outline),
-                  title: const Text('Cambiar contraseña'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _changePassword();
-                  },
-                ),
+                const SizedBox(height: 6),
+                _profileTile(Icons.person_outline, 'Cambiar nombre de usuario', _changeUsername),
+                _profileTile(Icons.alternate_email, 'Cambiar correo electrónico', _changeEmail),
+                _profileTile(Icons.lock_outline, 'Cambiar contraseña', _changePassword),
                 if (_isResident) ...[
-                  const Divider(),
+                  const SizedBox(height: 8),
                   const Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Accesos',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: VohkColors.textSecondary),
+                      'ACCESOS',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
                     ),
                   ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.vpn_key_outlined),
-                    title: const Text('Métodos de acceso'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _showAccessMethods();
-                    },
-                  ),
+                  const SizedBox(height: 6),
+                  _profileTile(Icons.vpn_key_outlined, 'Métodos de acceso', _showAccessMethods),
                 ],
-                const Divider(),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.logout, color: VohkColors.error),
-                  title: const Text('Cerrar sesión', style: TextStyle(color: VohkColors.error)),
+                const SizedBox(height: 8),
+                InkWell(
                   onTap: () {
                     Navigator.pop(context);
                     _logout();
                   },
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16, horizontal: 2),
+                    child: Row(
+                      children: [
+                        Icon(Icons.logout, color: VohkColors.error, size: 21),
+                        SizedBox(width: 15),
+                        Text(
+                          'Cerrar sesión',
+                          style: TextStyle(color: VohkColors.error, fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _profileTile(IconData icon, String title, VoidCallback action) {
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: VohkColors.border)),
+      ),
+      child: ListTile(
+        minTileHeight: 54,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 2),
+        leading: Icon(icon, color: Colors.white, size: 21),
+        title: Text(
+          title,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: VohkColors.textPrimary),
+        ),
+        trailing: const Icon(Icons.chevron_right, color: VohkColors.textMuted, size: 20),
+        onTap: () {
+          Navigator.pop(context);
+          action();
+        },
       ),
     );
   }
@@ -721,60 +730,77 @@ class _MainShellState extends State<MainShell> {
         : '';
     final canSwitchLocation = _locations.length > 1;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+      child: Column(
         children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: canSwitchLocation ? _showLocationSelector : null,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: VohkColors.accent, letterSpacing: 1.2),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Hola, $_firstName',
-                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: VohkColors.textPrimary, letterSpacing: -0.5),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          subtitle,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: VohkColors.textPrimary),
-                        ),
-                      ),
-                      if (canSwitchLocation) const Icon(Icons.keyboard_arrow_down_rounded, color: VohkColors.textSecondary, size: 22),
-                    ],
-                  ),
-                  if (detail.isNotEmpty) ...[const SizedBox(height: 2), Text(detail, style: const TextStyle(fontSize: 13, color: VohkColors.textSecondary))],
-                ],
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: _showProfileSheet,
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: VohkColors.accentDim,
-                shape: BoxShape.circle,
-                border: Border.all(color: VohkColors.accent, width: 1.5),
-              ),
-              child: Center(
-                child: Text(
-                  _initials,
-                  style: const TextStyle(color: VohkColors.accent, fontWeight: FontWeight.w700, fontSize: 15),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.accent, letterSpacing: 1.5),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Hola, $_firstName',
+                      style: const TextStyle(fontSize: 30, height: 1.05, fontWeight: FontWeight.w800, color: VohkColors.textPrimary, letterSpacing: -0.7),
+                    ),
+                  ],
                 ),
               ),
+              GestureDetector(
+                onTap: _showProfileSheet,
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: VohkColors.accentDim,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: VohkColors.accent.withOpacity(.65), width: 1.5),
+                  ),
+                  child: Center(
+                    child: Text(
+                      _initials,
+                      style: const TextStyle(color: VohkColors.accent, fontWeight: FontWeight.w800, fontSize: 16),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: canSwitchLocation ? _showLocationSelector : null,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        subtitle,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: VohkColors.textPrimary),
+                      ),
+                      if (detail.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          detail,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: VohkColors.textSecondary),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (canSwitchLocation) const Icon(Icons.keyboard_arrow_down_rounded, color: VohkColors.textSecondary, size: 22),
+              ],
             ),
           ),
+          const SizedBox(height: 15),
+          const Divider(),
         ],
       ),
     );
@@ -791,7 +817,7 @@ class _MainShellState extends State<MainShell> {
             _buildAppHeader(),
             Expanded(
               child: !_locationsLoaded
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator(color: VohkColors.accent))
                   : _currentLocation == null
                   ? Center(child: Text(_isResident ? 'No tienes propiedades asignadas.' : 'No tienes condominios asignados.'))
                   : IndexedStack(index: _currentIndex, children: _tabs),
@@ -801,15 +827,24 @@ class _MainShellState extends State<MainShell> {
       ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
+          color: Colors.black,
           border: Border(top: BorderSide(color: VohkColors.border)),
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
-          backgroundColor: Colors.black,
-          selectedItemColor: VohkColors.accent,
-          unselectedItemColor: Colors.grey,
-          items: _navigationItems,
+        child: SafeArea(
+          top: false,
+          child: BottomNavigationBar(
+            currentIndex: _currentIndex,
+            onTap: (index) => setState(() => _currentIndex = index),
+            backgroundColor: Colors.black,
+            selectedItemColor: VohkColors.accent,
+            unselectedItemColor: const Color(0xFF7A7A7E),
+            type: BottomNavigationBarType.fixed,
+            elevation: 0,
+            selectedFontSize: 10,
+            unselectedFontSize: 10,
+            iconSize: 23,
+            items: _navigationItems,
+          ),
         ),
       ),
     );

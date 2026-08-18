@@ -19,6 +19,7 @@ class _AdminDirectoryScreenState extends State<AdminDirectoryScreen> {
   bool _loading = true;
   bool _placingCall = false;
   int _loadGeneration = 0;
+  void _showMessage(String message) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 
   @override
   void initState() {
@@ -29,9 +30,7 @@ class _AdminDirectoryScreenState extends State<AdminDirectoryScreen> {
   @override
   void didUpdateWidget(covariant AdminDirectoryScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.currentCondominium?['condominium_id'] != widget.currentCondominium?['condominium_id']) {
-      _loadResidents();
-    }
+    if (oldWidget.currentCondominium?['condominium_id'] != widget.currentCondominium?['condominium_id']) _loadResidents();
   }
 
   Future<void> _loadResidents() async {
@@ -54,9 +53,7 @@ class _AdminDirectoryScreenState extends State<AdminDirectoryScreen> {
       if (!mounted || generation != _loadGeneration) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))));
     } finally {
-      if (mounted && generation == _loadGeneration) {
-        setState(() => _loading = false);
-      }
+      if (mounted && generation == _loadGeneration) setState(() => _loading = false);
     }
   }
 
@@ -86,14 +83,8 @@ class _AdminDirectoryScreenState extends State<AdminDirectoryScreen> {
         ),
       );
     } finally {
-      if (mounted) {
-        setState(() => _placingCall = false);
-      }
+      if (mounted) setState(() => _placingCall = false);
     }
-  }
-
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   List<Map<String, dynamic>> get _units {
@@ -108,25 +99,16 @@ class _AdminDirectoryScreenState extends State<AdminDirectoryScreen> {
         if (unitId == null || unitId.isEmpty) continue;
         final unit = units.putIfAbsent(unitId, () => {...location, 'residents': <Map<String, dynamic>>[]});
         final residents = unit['residents'] as List<Map<String, dynamic>>;
-        final alreadyAdded = residents.any((item) => item['user_id']?.toString() == resident['user_id']?.toString());
-        if (!alreadyAdded) {
-          residents.add(resident);
-        }
+        if (!residents.any((item) => item['user_id']?.toString() == resident['user_id']?.toString())) residents.add(resident);
       }
     }
     final result = units.values.toList();
     result.sort((first, second) {
-      final firstBuilding = first['building']?.toString() ?? '';
-      final secondBuilding = second['building']?.toString() ?? '';
-      final buildingComparison = firstBuilding.compareTo(secondBuilding);
+      final buildingComparison = (first['building']?.toString() ?? '').compareTo(second['building']?.toString() ?? '');
       if (buildingComparison != 0) return buildingComparison;
-      final firstFloor = int.tryParse(first['floor']?.toString() ?? '') ?? 0;
-      final secondFloor = int.tryParse(second['floor']?.toString() ?? '') ?? 0;
-      final floorComparison = firstFloor.compareTo(secondFloor);
+      final floorComparison = (int.tryParse(first['floor']?.toString() ?? '') ?? 0).compareTo(int.tryParse(second['floor']?.toString() ?? '') ?? 0);
       if (floorComparison != 0) return floorComparison;
-      final firstRoom = first['roomNo']?.toString() ?? '';
-      final secondRoom = second['roomNo']?.toString() ?? '';
-      return firstRoom.compareTo(secondRoom);
+      return (first['roomNo']?.toString() ?? '').compareTo(second['roomNo']?.toString() ?? '');
     });
     return result;
   }
@@ -136,72 +118,117 @@ class _AdminDirectoryScreenState extends State<AdminDirectoryScreen> {
     final units = _units;
     return Scaffold(
       backgroundColor: VohkColors.background,
-      appBar: AppBar(title: const Text('Directorio'), backgroundColor: VohkColors.surface),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _refresh,
-              color: VohkColors.accent,
-              backgroundColor: VohkColors.surface,
-              child: units.isEmpty
-                  ? ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      children: const [
-                        SizedBox(height: 220),
-                        Center(
-                          child: Text('No hay residentes en este condominio.', style: TextStyle(color: VohkColors.textSecondary)),
-                        ),
-                      ],
-                    )
-                  : ListView.separated(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(16),
-                      itemCount: units.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final unit = units[index];
-                        final residents = unit['residents'] as List<Map<String, dynamic>>;
-                        return Card(
-                          color: VohkColors.surface,
-                          child: ExpansionTile(
-                            leading: const Icon(Icons.apartment, color: VohkColors.accent),
-                            title: Text(
-                              unit['unit']?.toString() ?? 'Unidad',
-                              style: const TextStyle(color: VohkColors.textPrimary, fontWeight: FontWeight.w700),
-                            ),
-                            subtitle: Text(
-                              '${unit['building'] ?? ''} · Piso ${unit['floor'] ?? ''} · ${unit['roomNo'] ?? ''}',
-                              style: const TextStyle(color: VohkColors.textSecondary),
-                            ),
-                            children: residents.map((resident) {
-                              final enabled = resident['active'] == true;
-                              final canCall = enabled && resident['sip_identity']?.toString().isNotEmpty == true;
-                              return ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: VohkColors.accentDim,
-                                  child: Text(
-                                    _initial(resident['legal_name']?.toString()),
-                                    style: const TextStyle(color: VohkColors.accent, fontWeight: FontWeight.w700),
-                                  ),
-                                ),
-                                title: Text(
-                                  resident['legal_name']?.toString() ?? 'Residente',
-                                  style: TextStyle(color: enabled ? VohkColors.textPrimary : VohkColors.textMuted),
-                                ),
-                                subtitle: Text(resident['email']?.toString() ?? '', style: const TextStyle(color: VohkColors.textSecondary)),
-                                trailing: IconButton(
-                                  onPressed: canCall && !_placingCall ? () => _callResident(resident) : null,
-                                  icon: const Icon(Icons.call),
-                                  color: VohkColors.callGreen,
-                                  tooltip: 'Llamar',
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        );
-                      },
-                    ),
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        color: VohkColors.accent,
+        backgroundColor: VohkColors.surface,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(24, 14, 24, 110),
+          children: [
+            TextField(
+              readOnly: true,
+              style: const TextStyle(color: VohkColors.textPrimary, fontSize: 14),
+              decoration: const InputDecoration(
+                hintText: 'Buscar unidad o contacto',
+                prefixIcon: Icon(Icons.search, color: VohkColors.textSecondary, size: 20),
+              ),
             ),
+            const SizedBox(height: 12),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.only(top: 120),
+                child: Center(child: CircularProgressIndicator(color: VohkColors.accent)),
+              )
+            else if (units.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: 120),
+                child: Center(
+                  child: Text('No hay residentes en este condominio.', style: TextStyle(color: VohkColors.textSecondary)),
+                ),
+              )
+            else
+              ...units.map(_unitCard),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _unitCard(Map<String, dynamic> unit) {
+    final residents = unit['residents'] as List<Map<String, dynamic>>;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: VohkColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: VohkColors.border),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          childrenPadding: EdgeInsets.zero,
+          leading: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(color: VohkColors.accentDim, borderRadius: BorderRadius.circular(12)),
+            child: const Icon(Icons.apartment_outlined, color: VohkColors.accent, size: 21),
+          ),
+          iconColor: VohkColors.textSecondary,
+          collapsedIconColor: VohkColors.textSecondary,
+          title: Text(
+            unit['unit']?.toString() ?? 'Unidad',
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: VohkColors.textPrimary),
+          ),
+          subtitle: Text(
+            '${unit['building'] ?? ''} · Piso ${unit['floor'] ?? ''} · ${unit['roomNo'] ?? ''}',
+            style: const TextStyle(fontSize: 12, color: VohkColors.textSecondary),
+          ),
+          children: residents.map((resident) {
+            final enabled = resident['active'] == true;
+            final canCall = enabled && resident['sip_identity']?.toString().isNotEmpty == true;
+            return Container(
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: VohkColors.border)),
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+                leading: CircleAvatar(
+                  radius: 19,
+                  backgroundColor: VohkColors.accentDim,
+                  child: Text(
+                    _initial(resident['legal_name']?.toString()),
+                    style: const TextStyle(color: VohkColors.accent, fontWeight: FontWeight.w700, fontSize: 13),
+                  ),
+                ),
+                title: Text(
+                  resident['legal_name']?.toString() ?? 'Residente',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: enabled ? VohkColors.textPrimary : VohkColors.textMuted),
+                ),
+                subtitle: Text(
+                  resident['email']?.toString() ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11, color: VohkColors.textSecondary),
+                ),
+                trailing: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(color: VohkColors.callGreen.withOpacity(.15), shape: BoxShape.circle),
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: canCall && !_placingCall ? () => _callResident(resident) : null,
+                    icon: const Icon(Icons.call_outlined, size: 19),
+                    color: VohkColors.callGreen,
+                    tooltip: 'Llamar',
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
     );
   }
 
