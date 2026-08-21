@@ -87,6 +87,9 @@ class IncomingCallService {
         if (intercom == null) {
           throw Exception('Intercom device $deviceId was not found.');
         }
+        intercom['name'] = payload['intercom_name']?.toString().isNotEmpty == true ? payload['intercom_name'].toString() : intercom['name'];
+        intercom['condominium_name'] = payload['condominium_name']?.toString() ?? '';
+        intercom['caller_name'] = payload['caller_name']?.toString() ?? intercom['name'];
         await navigator.push(MaterialPageRoute(builder: (_) => IncomingCallScreen(intercom: intercom)));
         return;
       }

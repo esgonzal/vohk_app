@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:vohk_app/models/event.dart';
 import 'api_config.dart';
 import 'auth_service.dart';
 import 'package:flutter/foundation.dart';
@@ -125,13 +124,17 @@ class VohkApi {
     }
   }
 
-  static Future<List<Event>> fetchDetections() async {
-    final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/events'), headers: _headers());
-    if (res.statusCode != 200) {
-      throw Exception('Failed to load detections');
+  static Future<List<Map<String, dynamic>>> getActivities({required String condominiumId, int limit = 10}) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/activities').replace(queryParameters: {'condominiumId': condominiumId, 'limit': limit.toString()});
+    final response = await http.get(uri, headers: _headers());
+    if (response.statusCode != 200) {
+      throw Exception(_responseError(response, 'No se pudo cargar la actividad reciente.'));
     }
-    final List data = jsonDecode(res.body);
-    return data.map((e) => Event.fromJson(e)).toList();
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) {
+      throw Exception('Respuesta inv\u00e1lida al cargar la actividad.');
+    }
+    return decoded.map((item) => Map<String, dynamic>.from(item as Map)).toList();
   }
 
   static Future<List<dynamic>> getResidentUnits() async {

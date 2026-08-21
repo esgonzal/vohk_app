@@ -12,8 +12,7 @@ class IncomingCallScreen extends StatefulWidget {
   State<IncomingCallScreen> createState() => _IncomingCallScreenState();
 }
 
-class _IncomingCallScreenState extends State<IncomingCallScreen>
-    with WidgetsBindingObserver {
+class _IncomingCallScreenState extends State<IncomingCallScreen> with WidgetsBindingObserver {
   StreamSubscription? _callSubscription;
   bool loadingDoor = false;
   bool answering = false;
@@ -30,9 +29,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   void _listenToCallEvents() {
     _callSubscription = TwilioVoice.instance.callEventsListener.listen((event) {
       debugPrint("INCOMING CALL SCREEN📞 Call event: $event");
-      if (event == CallEvent.callEnded ||
-          event == CallEvent.declined ||
-          event.toString().contains("Abort")) {
+      if (event == CallEvent.callEnded || event == CallEvent.declined || event.toString().contains("Abort")) {
         if (mounted && Navigator.of(context).canPop()) {
           Navigator.of(context).pop();
         }
@@ -53,17 +50,11 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
       setState(() => loadingDoor = true);
       final ok = await VohkApi.openDoor(widget.intercom['device_id']);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(ok ? 'Puerta abierta' : 'No se pudo abrir la puerta'),
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? 'Puerta abierta' : 'No se pudo abrir la puerta')));
     } catch (e) {
       debugPrint('OPEN DOOR ERROR: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error abriendo puerta: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error abriendo puerta: $e')));
     } finally {
       if (mounted) setState(() => loadingDoor = false);
     }
@@ -96,86 +87,45 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   @override
   Widget build(BuildContext context) {
     final intercom = widget.intercom;
+    final intercomName = intercom['name']?.toString() ?? 'Videoportero';
+    final condominiumName = intercom['condominium_name']?.toString() ?? '';
     return Scaffold(
-      appBar: AppBar(title: Text(intercom['name'])),
+      appBar: AppBar(title: Text(condominiumName.isEmpty ? intercomName : '$intercomName · $condominiumName')),
       body: Column(
         children: [
-          Expanded(
-            child: LiveCameraView(streamUrl: intercom['stream_url'] ?? ''),
-          ),
+          Expanded(child: LiveCameraView(streamUrl: intercom['stream_url'] ?? '')),
           Container(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                const Text(
-                  'Llamada entrante',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
+                const Text('Llamada entrante', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                Text(
-                  intercom['name'],
-                  style: const TextStyle(fontSize: 16, color: Colors.grey),
-                ),
+                Text(intercomName, style: const TextStyle(fontSize: 16, color: Colors.grey)),
+                if (condominiumName.isNotEmpty) ...[const SizedBox(height: 4), Text(condominiumName, style: const TextStyle(fontSize: 14, color: Colors.grey))],
                 const SizedBox(height: 20),
                 Row(
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: answering ? null : answerCall,
-                        icon: answering
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.call),
-                        label: const Text(
-                          'Responder',
-                          style: TextStyle(fontSize: 12),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        icon: answering ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.call),
+                        label: const Text('Responder', style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: loadingDoor ? null : openDoor,
-                        icon: loadingDoor
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.lock_open),
-                        label: const Text(
-                          'Abrir',
-                          style: TextStyle(fontSize: 12),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        icon: loadingDoor ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.lock_open),
+                        label: const Text('Abrir', style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: hangingUp ? null : hangUp,
-                        icon: hangingUp
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.call_end),
-                        label: const Text(
-                          'Colgar',
-                          style: TextStyle(fontSize: 12),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        icon: hangingUp ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.call_end),
+                        label: const Text('Colgar', style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
                       ),
                     ),
                   ],
