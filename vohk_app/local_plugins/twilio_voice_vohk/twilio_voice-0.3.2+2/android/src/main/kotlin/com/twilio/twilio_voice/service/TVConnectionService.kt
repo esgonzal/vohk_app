@@ -746,60 +746,38 @@ class TVConnectionService : ConnectionService() {
 
     @SuppressLint("MissingPermission")
     private fun showIncomingCallNotification(callInvite: CallInvite) {
-        val launchIntent =
-            packageManager.getLaunchIntentForPackage(packageName)
-        if (launchIntent == null) { 
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+        if (launchIntent == null) {
             Log.e(TAG, "Unable to obtain the application launch intent.")
             return
         }
+        val callerName = callInvite.customParameters["__TWI_CALLER_NAME"]
+            ?.takeIf { it.isNotBlank() }
+            ?: callInvite.customParameters["caller_name"]
+                ?.takeIf { it.isNotBlank() }
+            ?: callInvite.from
+                ?.takeIf { it.isNotBlank() }
+            ?: "Vöhk"
         launchIntent.apply {
             action = ACTION_OPEN_INCOMING_CALL
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra(EXTRA_CALL_HANDLE, callInvite.callSid)
-            callInvite.customParameters.forEach { (key, value) ->
-                putExtra(key, value)
-            }
+            callInvite.customParameters.forEach { (key, value) -> putExtra(key, value) }
         }
-        val pendingIntentFlags =
-            PendingIntent.FLAG_UPDATE_CURRENT or
-            PendingIntent.FLAG_IMMUTABLE
-        val openPendingIntent = PendingIntent.getActivity(
-            this,
-            callInvite.callSid.hashCode(),
-            launchIntent,
-            pendingIntentFlags,
-        )
-        val rejectIntent = Intent(
-            this,
-            TVConnectionService::class.java,
-        ).apply {
+        val pendingIntentFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        val openPendingIntent = PendingIntent.getActivity(this,callInvite.callSid.hashCode(),launchIntent,pendingIntentFlags,)
+        val rejectIntent = Intent(this,TVConnectionService::class.java,).apply {
             action = ACTION_HANGUP
             putExtra(EXTRA_CALL_HANDLE, callInvite.callSid)
         }
         val rejectPendingIntent = PendingIntent.getService(this,callInvite.callSid.hashCode() + 1,rejectIntent,pendingIntentFlags,)
         val channel = getOrCreateIncomingCallChannel()
-        val rejectAction = Notification.Action.Builder(
-            Icon.createWithResource(
-                this,
-                android.R.drawable.ic_menu_close_clear_cancel,
-            ),
-            "Rechazar",
-            rejectPendingIntent,
-        ).build()
-
-        val openAction = Notification.Action.Builder(
-            Icon.createWithResource(
-                this,
-                android.R.drawable.ic_menu_view,
-            ),
-            "Ver",
-            openPendingIntent,
-        ).build()
-
+        val rejectAction = Notification.Action.Builder(Icon.createWithResource(this,android.R.drawable.ic_menu_close_clear_cancel,),"Rechazar",rejectPendingIntent,).build()
+        val openAction = Notification.Action.Builder(Icon.createWithResource(this,android.R.drawable.ic_menu_view,),"Ver",openPendingIntent,).build()
         val notification = Notification.Builder(this, channel.id)
             .setSmallIcon(R.drawable.ic_microphone)
             .setContentTitle("Llamada entrante")
-            .setContentText("Alguien está llamando desde Vohk")
+            .setContentText(callerName)
             .setCategory(Notification.CATEGORY_CALL)
             .setPriority(Notification.PRIORITY_MAX)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
@@ -810,7 +788,6 @@ class TVConnectionService : ConnectionService() {
             .addAction(rejectAction)
             .addAction(openAction)
             .build()
-
         notification.flags = notification.flags or Notification.FLAG_INSISTENT
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(INCOMING_CALL_NOTIFICATION_ID,notification,)

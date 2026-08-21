@@ -28,6 +28,11 @@ class _MainShellState extends State<MainShell> {
   Map<String, dynamic>? _currentLocation;
   bool get _isResident => AuthService.role == 'resident';
 
+  bool get _residentCameraAccess {
+    if (!_isResident) return true;
+    return _currentLocation?['resident_camera_access'] == true;
+  }
+
   String? get _currentCondominiumId {
     return _currentLocation?['condominium_id']?.toString();
   }
@@ -43,6 +48,7 @@ class _MainShellState extends State<MainShell> {
         HomeScreen(key: ValueKey('home-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
         IntercomsScreen(key: ValueKey('intercoms-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
         InvitationsScreen(key: ValueKey('invitations-$_currentUnitId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
+        if (_residentCameraAccess) CamerasScreen(key: ValueKey('cameras-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
       ];
     }
     return [
@@ -55,10 +61,11 @@ class _MainShellState extends State<MainShell> {
 
   List<BottomNavigationBarItem> get _navigationItems {
     if (_isResident) {
-      return const [
-        BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Inicio'),
-        BottomNavigationBarItem(icon: Icon(Icons.door_front_door_outlined), activeIcon: Icon(Icons.door_front_door), label: 'Accesos'),
-        BottomNavigationBarItem(icon: Icon(Icons.person_add_outlined), activeIcon: Icon(Icons.person_add), label: 'Invitados'),
+      return [
+        const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Inicio'),
+        const BottomNavigationBarItem(icon: Icon(Icons.door_front_door_outlined), activeIcon: Icon(Icons.door_front_door), label: 'Accesos'),
+        const BottomNavigationBarItem(icon: Icon(Icons.person_add_outlined), activeIcon: Icon(Icons.person_add), label: 'Invitados'),
+        if (_residentCameraAccess) const BottomNavigationBarItem(icon: Icon(Icons.videocam_outlined), activeIcon: Icon(Icons.videocam), label: 'Cámaras'),
       ];
     }
     return const [
@@ -99,6 +106,9 @@ class _MainShellState extends State<MainShell> {
         _locations = locations;
         _currentLocation = selectedLocation;
         _locationsLoaded = true;
+        if (_currentIndex >= _tabs.length) {
+          _currentIndex = 0;
+        }
       });
     } catch (error) {
       debugPrint('Could not load locations: $error');
@@ -113,7 +123,12 @@ class _MainShellState extends State<MainShell> {
     final currentId = _currentLocation?[locationKey]?.toString();
     final selectedId = location[locationKey]?.toString();
     if (currentId == selectedId) return;
-    setState(() => _currentLocation = Map<String, dynamic>.from(location));
+    setState(() {
+      _currentLocation = Map<String, dynamic>.from(location);
+      if (_currentIndex >= _tabs.length) {
+        _currentIndex = 0;
+      }
+    });
   }
 
   Future<void> _logout() async {
@@ -531,11 +546,6 @@ class _MainShellState extends State<MainShell> {
     return name.isNotEmpty ? name[0].toUpperCase() : 'U';
   }
 
-  String get _firstName {
-    final name = AuthService.username ?? 'Usuario';
-    return name.trim().split(' ').first;
-  }
-
   void _showLocationSelector() {
     if (_locations.length <= 1) return;
     final locationKey = _isResident ? 'unit_id' : 'condominium_id';
@@ -721,7 +731,6 @@ class _MainShellState extends State<MainShell> {
   }
 
   Widget _buildAppHeader() {
-    final title = _isResident ? 'PROPIEDAD ACTIVA' : 'CONDOMINIO ACTIVO';
     final subtitle = _currentLocation?['condominium_name']?.toString() ?? _currentLocation?['name']?.toString() ?? 'Cargando ubicación...';
     final detail = _isResident && _currentLocation != null
         ? '${_currentLocation!['unit_name'] ?? ''} · Piso ${_currentLocation!['floor'] ?? ''} · ${_currentLocation!['room_no'] ?? ''}'
@@ -730,33 +739,54 @@ class _MainShellState extends State<MainShell> {
         : '';
     final canSwitchLocation = _locations.length > 1;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
       child: Column(
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.accent, letterSpacing: 1.5),
+                child: InkWell(
+                  onTap: canSwitchLocation ? _showLocationSelector : null,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                subtitle,
+                                style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700, color: VohkColors.textPrimary),
+                              ),
+                              if (detail.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  detail,
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: VohkColors.textSecondary),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        if (canSwitchLocation)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 6),
+                            child: Icon(Icons.keyboard_arrow_down_rounded, color: VohkColors.textSecondary, size: 24),
+                          ),
+                      ],
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Hola, $_firstName',
-                      style: const TextStyle(fontSize: 30, height: 1.05, fontWeight: FontWeight.w800, color: VohkColors.textPrimary, letterSpacing: -0.7),
-                    ),
-                  ],
+                  ),
                 ),
               ),
+              const SizedBox(width: 18),
               GestureDetector(
                 onTap: _showProfileSheet,
                 child: Container(
-                  width: 46,
-                  height: 46,
+                  width: 50,
+                  height: 50,
                   decoration: BoxDecoration(
                     color: VohkColors.accentDim,
                     shape: BoxShape.circle,
@@ -765,39 +795,12 @@ class _MainShellState extends State<MainShell> {
                   child: Center(
                     child: Text(
                       _initials,
-                      style: const TextStyle(color: VohkColors.accent, fontWeight: FontWeight.w800, fontSize: 16),
+                      style: const TextStyle(color: VohkColors.accent, fontWeight: FontWeight.w800, fontSize: 17),
                     ),
                   ),
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-          InkWell(
-            onTap: canSwitchLocation ? _showLocationSelector : null,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        subtitle,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: VohkColors.textPrimary),
-                      ),
-                      if (detail.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          detail,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: VohkColors.textSecondary),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                if (canSwitchLocation) const Icon(Icons.keyboard_arrow_down_rounded, color: VohkColors.textSecondary, size: 22),
-              ],
-            ),
           ),
           const SizedBox(height: 15),
           const Divider(),
@@ -808,6 +811,9 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final tabs = _tabs;
+    final navigationItems = _navigationItems;
+    final safeIndex = _currentIndex < tabs.length ? _currentIndex : 0;
     return Scaffold(
       backgroundColor: VohkColors.background,
       body: SafeArea(
@@ -820,7 +826,7 @@ class _MainShellState extends State<MainShell> {
                   ? const Center(child: CircularProgressIndicator(color: VohkColors.accent))
                   : _currentLocation == null
                   ? Center(child: Text(_isResident ? 'No tienes propiedades asignadas.' : 'No tienes condominios asignados.'))
-                  : IndexedStack(index: _currentIndex, children: _tabs),
+                  : IndexedStack(index: safeIndex, children: tabs),
             ),
           ],
         ),
@@ -833,7 +839,7 @@ class _MainShellState extends State<MainShell> {
         child: SafeArea(
           top: false,
           child: BottomNavigationBar(
-            currentIndex: _currentIndex,
+            currentIndex: safeIndex,
             onTap: (index) => setState(() => _currentIndex = index),
             backgroundColor: Colors.black,
             selectedItemColor: VohkColors.accent,
@@ -843,7 +849,7 @@ class _MainShellState extends State<MainShell> {
             selectedFontSize: 10,
             unselectedFontSize: 10,
             iconSize: 23,
-            items: _navigationItems,
+            items: navigationItems,
           ),
         ),
       ),

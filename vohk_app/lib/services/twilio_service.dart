@@ -56,7 +56,7 @@ class TwilioService {
   }
 
   static Future<void> unregister({required String jwt}) async {
-    if (jwt.isEmpty) return;
+    if (jwt.isEmpty || !_initialized) return;
     final accessToken = await _fetchAccessToken(jwt);
     final result = await TwilioVoice.instance.unregister(accessToken: accessToken);
     if (result == false) {

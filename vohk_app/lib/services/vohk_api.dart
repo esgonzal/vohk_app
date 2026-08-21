@@ -47,22 +47,12 @@ class VohkApi {
     return jsonDecode(res.body);
   }
 
-  static Future<Map<String, dynamic>?> getIntercomByDeviceId(String deviceId) async {
-    final intercoms = await getIntercoms();
-    for (final rawIntercom in intercoms) {
-      if (rawIntercom is! Map) {
-        continue;
+  static Future<Map<String, dynamic>?> getIntercomByDeviceId(String deviceId, String condominiumId) async {
+    final devices = await getDevices(condominiumId: condominiumId);
+    for (final device in devices) {
+      if (device is Map && device['device_id']?.toString() == deviceId && device['type']?.toString() == 'intercom') {
+        return Map<String, dynamic>.from(device);
       }
-      final intercom = Map<String, dynamic>.from(rawIntercom);
-      if (intercom['id']?.toString() != deviceId) {
-        continue;
-      }
-      return {
-        'device_id': intercom['id']?.toString() ?? '',
-        'name': intercom['name']?.toString() ?? 'Intercomunicador',
-        'snapshot_url': intercom['snapshot']?.toString() ?? '',
-        'stream_url': intercom['url']?.toString() ?? '',
-      };
     }
     return null;
   }
@@ -146,7 +136,7 @@ class VohkApi {
 
   static Future<List<dynamic>> getResidentUnits() async {
     try {
-      final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/admin/resident/units'), headers: _headers());
+      final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/units/resident/units'), headers: _headers());
       if (res.statusCode == 200) {
         return jsonDecode(res.body) as List<dynamic>;
       }

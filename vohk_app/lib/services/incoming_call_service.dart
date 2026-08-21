@@ -76,10 +76,14 @@ class IncomingCallService {
       }
       if (callType == 'intercom') {
         final deviceId = payload['device_id']?.toString();
+        final condominiumId = payload['condominium_id']?.toString();
         if (deviceId == null || deviceId.isEmpty) {
           throw Exception('Intercom call is missing device_id.');
         }
-        final intercom = await VohkApi.getIntercomByDeviceId(deviceId);
+        if (condominiumId == null || condominiumId.isEmpty) {
+          throw Exception('Intercom call is missing condominium_id.');
+        }
+        final intercom = await VohkApi.getIntercomByDeviceId(deviceId, condominiumId);
         if (intercom == null) {
           throw Exception('Intercom device $deviceId was not found.');
         }

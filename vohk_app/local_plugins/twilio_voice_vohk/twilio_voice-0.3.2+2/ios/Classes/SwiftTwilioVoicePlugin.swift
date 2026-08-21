@@ -516,12 +516,16 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     
     public func callInviteReceived(callInvite: CallInvite) {
-        self.sendPhoneCallEvents(description: "LOG|callInviteReceived:", isError: false)
-        UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
-        var from:String = callInvite.from ?? defaultCaller
-        from = from.replacingOccurrences(of: "client:", with: "")
-        self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
-        reportIncomingCall(from: from, uuid: callInvite.uuid)
+        self.sendPhoneCallEvents(description: "LOG|callInviteReceived:",isError: false)
+        UserDefaults.standard.set(Date(),forKey: kCachedBindingDate)
+        var from = callInvite.from ?? defaultCaller
+        from = from.replacingOccurrences(of: "client:",with: "")
+        let callerName =
+            callInvite.customParameters?["__TWI_CALLER_NAME"] as? String
+            ?? callInvite.customParameters?["caller_name"] as? String
+            ?? from
+        self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))",isError: false)
+        reportIncomingCall(from: from,callerName: callerName,uuid: callInvite.uuid)
         self.callInvite = callInvite
     }
     
@@ -799,18 +803,14 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
     }
 
-    func reportIncomingCall(from: String, uuid: UUID) {
+    func reportIncomingCall(from: String, callerName: String?, uuid: UUID) {
         let callHandle = CXHandle(type: .generic, value: from)
-        var callerName: String?;
-        if(from.contains("client:")) {
-            var clientName = from.replacingOccurrences(of: "client:", with: "")
-            callerName = self.clients[clientName];
-        } else {
-            callerName = from
-        }
         let callUpdate = CXCallUpdate()
         callUpdate.remoteHandle = callHandle
-        callUpdate.localizedCallerName = callerName ?? self.clients["defaultCaller"] ?? defaultCaller
+        callUpdate.localizedCallerName =
+            callerName
+            ?? self.clients["defaultCaller"]
+            ?? defaultCaller
         callUpdate.supportsDTMF = true
         callUpdate.supportsHolding = true
         callUpdate.supportsGrouping = false
@@ -818,9 +818,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         callUpdate.hasVideo = false
         callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
             if let error = error {
-                self.sendPhoneCallEvents(description: "LOG|Failed to report incoming call successfully: \(error.localizedDescription).", isError: false)
+                self.sendPhoneCallEvents(description: "LOG|Failed to report incoming call successfully: \(error.localizedDescription).",isError: false)
             } else {
-                self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.", isError: false)
+                self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.",isError: false)
             }
         }
     }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_config.dart';
+import 'dart:io';
 
 class AuthService {
   static String? username;
@@ -116,10 +117,15 @@ class AuthService {
     if (currentJwt == null || currentJwt.isEmpty) {
       throw Exception('Cannot register FCM without authentication.');
     }
+    final platform = Platform.isAndroid
+        ? 'android'
+        : Platform.isIOS
+        ? 'ios'
+        : 'unknown';
     final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/auth/register-fcm'),
       headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $currentJwt'},
-      body: jsonEncode({'fcmToken': fcmToken}),
+      body: jsonEncode({'fcmToken': fcmToken, 'platform': platform}),
     );
     if (response.statusCode != 200) {
       throw Exception('FCM registration failed: ${response.statusCode} ${response.body}');
