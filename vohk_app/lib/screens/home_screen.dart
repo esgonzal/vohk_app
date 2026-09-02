@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:vohk_app/services/vohk_api.dart';
 import 'package:vohk_app/screens/intercom_detail_screen.dart';
@@ -17,11 +19,21 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _intercoms = [];
   List<Map<String, dynamic>> _activities = [];
   bool _loading = true;
+  Timer? _activityRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     if (widget.currentUnit != null) _fetchIntercoms();
+    _activityRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (widget.currentUnit != null) _fetchHomeData();
+    });
+  }
+
+  @override
+  void dispose() {
+    _activityRefreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _refresh() async {
@@ -175,16 +187,28 @@ class _HomeScreenState extends State<HomeScreen> {
         children: List.generate(_activities.length, (index) {
           final activity = _activities[index];
           final isDoor = activity['event_type'] == 'door_open';
+          final isAccess = activity['event_type'] == 'access';
           final actor = activity['actor_name']?.toString();
           final device = activity['device_name']?.toString() ?? 'Videoportero';
-          final status = _activityStatus(activity['status']?.toString());
+          final status = _activityStatus(activity);
           final occurredAt = DateTime.tryParse(activity['occurred_at']?.toString() ?? '')?.toLocal();
-          final title = isDoor ? '${actor ?? 'Usuario'} abri\u00f3 $device' : _callDescription(activity);
+          final title = isAccess
+              ? _accessDescription(activity)
+              : isDoor
+              ? '${actor ?? 'Usuario'} abri\u00f3 $device'
+              : _callDescription(activity);
           return Column(
             children: [
               if (index > 0) const Divider(indent: 58),
               ListTile(
-                leading: Icon(isDoor ? Icons.lock_open_outlined : Icons.call_outlined, color: VohkColors.accent),
+                leading: Icon(
+                  isAccess
+                      ? Icons.badge_outlined
+                      : isDoor
+                      ? Icons.lock_open_outlined
+                      : Icons.call_outlined,
+                  color: VohkColors.accent,
+                ),
                 title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
                 subtitle: Text('${_formatActivityTime(occurredAt)} \u00b7 $status'),
               ),
@@ -214,7 +238,23 @@ class _HomeScreenState extends State<HomeScreen> {
     return 'Llamada registrada';
   }
 
-  String _activityStatus(String? status) {
+  String _accessDescription(Map<String, dynamic> activity) {
+    final metadata = activity['metadata'] as Map<String, dynamic>? ?? const {};
+    final subject = activity['actor_name']?.toString() ?? metadata['subjectName']?.toString() ?? 'Persona no identificada';
+    final description = metadata['description']?.toString();
+    final method = metadata['methodLabel']?.toString();
+    if (description != null && description.isNotEmpty) return '$subject: $description';
+    if (method != null && method.isNotEmpty) return '$subject accedió mediante $method';
+    return '$subject registró un intento de acceso';
+  }
+
+  String _activityStatus(Map<String, dynamic> activity) {
+    final status = activity['status']?.toString();
+    if (activity['event_type'] == 'access') {
+      if (status == 'succeeded') return 'permitido';
+      if (status == 'failed') return 'rechazado';
+      if (status == 'recorded') return 'registrado';
+    }
     const labels = {
       'initiated': 'iniciada',
       'ringing': 'sonando',
@@ -225,6 +265,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'failed': 'fallida',
       'canceled': 'cancelada',
       'succeeded': 'realizado',
+      'recorded': 'registrado',
     };
     return labels[status] ?? status ?? '';
   }

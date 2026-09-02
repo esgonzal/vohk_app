@@ -55,6 +55,7 @@ class _MainShellState extends State<MainShell> {
       HomeScreen(key: ValueKey('home-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
       IntercomsScreen(key: ValueKey('intercoms-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
       AdminDirectoryScreen(key: ValueKey('directory-$_currentCondominiumId'), currentCondominium: _currentLocation, onRefreshLocations: _loadLocations),
+      InvitationsScreen(key: ValueKey('invitations-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
       CamerasScreen(key: ValueKey('cameras-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
     ];
   }
@@ -72,6 +73,7 @@ class _MainShellState extends State<MainShell> {
       BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Inicio'),
       BottomNavigationBarItem(icon: Icon(Icons.door_front_door_outlined), activeIcon: Icon(Icons.door_front_door), label: 'Accesos'),
       BottomNavigationBarItem(icon: Icon(Icons.groups_outlined), activeIcon: Icon(Icons.groups), label: 'Unidades'),
+      BottomNavigationBarItem(icon: Icon(Icons.person_add_outlined), activeIcon: Icon(Icons.person_add), label: 'Invitados'),
       BottomNavigationBarItem(icon: Icon(Icons.videocam_outlined), activeIcon: Icon(Icons.videocam), label: 'Cámaras'),
     ];
   }
@@ -583,10 +585,9 @@ class _MainShellState extends State<MainShell> {
                   final subtitle = _isResident
                       ? '${location['unit_name'] ?? ''} · Piso ${location['floor'] ?? ''} · ${location['room_no'] ?? ''}'
                       : '${location['address'] ?? ''} · ${location['city'] ?? ''}';
-                  return Container(
-                    decoration: const BoxDecoration(
-                      border: Border(bottom: BorderSide(color: VohkColors.border)),
-                    ),
+                  return Material(
+                    color: Colors.transparent,
+                    shape: const Border(bottom: BorderSide(color: VohkColors.border)),
                     child: ListTile(
                       minTileHeight: 68,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 2),
@@ -709,10 +710,9 @@ class _MainShellState extends State<MainShell> {
   }
 
   Widget _profileTile(IconData icon, String title, VoidCallback action) {
-    return Container(
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: VohkColors.border)),
-      ),
+    return Material(
+      color: Colors.transparent,
+      shape: const Border(bottom: BorderSide(color: VohkColors.border)),
       child: ListTile(
         minTileHeight: 54,
         contentPadding: const EdgeInsets.symmetric(horizontal: 2),

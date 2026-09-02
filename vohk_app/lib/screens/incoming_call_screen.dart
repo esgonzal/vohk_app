@@ -17,6 +17,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> with WidgetsBin
   bool loadingDoor = false;
   bool answering = false;
   bool hangingUp = false;
+  bool _speakerphoneEnabled = false;
 
   @override
   void initState() {
@@ -29,12 +30,27 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> with WidgetsBin
   void _listenToCallEvents() {
     _callSubscription = TwilioVoice.instance.callEventsListener.listen((event) {
       debugPrint("INCOMING CALL SCREEN📞 Call event: $event");
+      if (event == CallEvent.connected) {
+        unawaited(_enableSpeakerphone());
+      }
       if (event == CallEvent.callEnded || event == CallEvent.declined || event.toString().contains("Abort")) {
         if (mounted && Navigator.of(context).canPop()) {
           Navigator.of(context).pop();
         }
       }
     });
+  }
+
+  Future<void> _enableSpeakerphone() async {
+    if (_speakerphoneEnabled) return;
+    try {
+      final changed = await TwilioVoice.instance.call.toggleSpeaker(true);
+      final enabled = await TwilioVoice.instance.call.isOnSpeaker();
+      _speakerphoneEnabled = changed == true && enabled == true;
+      debugPrint(_speakerphoneEnabled ? 'INCOMING CALL AUDIO: speakerphone enabled' : 'INCOMING CALL AUDIO: unable to confirm speakerphone route');
+    } catch (error) {
+      debugPrint('INCOMING CALL SPEAKER ERROR: $error');
+    }
   }
 
   @override

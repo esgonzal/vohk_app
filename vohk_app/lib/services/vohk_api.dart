@@ -95,26 +95,87 @@ class VohkApi {
 
   static Future<Map<String, dynamic>> createInvitation({
     required String unitId,
-    required DateTime validFrom,
-    required DateTime validUntil,
+    required String type,
     required List<String> deviceIds,
-    String type = 'visit',
+    String? residentUserId,
+    DateTime? validFrom,
+    DateTime? validUntil,
+    int? durationHours,
+    String? name,
+    String? rut,
+    String? email,
+    String? phone,
+    String? vehiclePlate,
+    File? photo,
+    bool biometricConsent = false,
   }) async {
-    final response = await http.post(
-      Uri.parse('${ApiConfig.baseUrl}/invitation'),
-      headers: _headers(),
-      body: jsonEncode({
-        'unitId': unitId,
-        'validFrom': validFrom.toUtc().toIso8601String(),
-        'validUntil': validUntil.toUtc().toIso8601String(),
-        'type': type,
-        'deviceIds': deviceIds,
-      }),
-    );
+    debugPrint('CREATE INVITATION INPUT');
+    debugPrint('unitId: $unitId');
+    debugPrint('type: $type');
+    debugPrint('deviceIds: $deviceIds');
+    debugPrint('residentUserId: $residentUserId');
+    debugPrint('validFrom: $validFrom');
+    debugPrint('validUntil: $validUntil');
+    debugPrint('durationHours: $durationHours');
+    debugPrint('name: $name');
+    debugPrint('rut: $rut');
+    debugPrint('email: $email');
+    debugPrint('phone: $phone');
+    debugPrint('vehiclePlate: $vehiclePlate');
+    debugPrint('photo: ${photo?.path}');
+    debugPrint('biometricConsent: $biometricConsent');
+    final request = http.MultipartRequest('POST', Uri.parse('${ApiConfig.baseUrl}/invitation'));
+    final token = AuthService.jwt;
+    if (token != null && token.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+    request.fields['unitId'] = unitId;
+    request.fields['type'] = type;
+    request.fields['deviceIds'] = jsonEncode(deviceIds);
+    request.fields['biometricConsent'] = biometricConsent.toString();
+    if (residentUserId != null && residentUserId.isNotEmpty) {
+      request.fields['residentUserId'] = residentUserId;
+    }
+    if (validFrom != null) {
+      request.fields['validFrom'] = validFrom.toUtc().toIso8601String();
+    }
+    if (validUntil != null) {
+      request.fields['validUntil'] = validUntil.toUtc().toIso8601String();
+    }
+    if (durationHours != null) {
+      request.fields['durationHours'] = durationHours.toString();
+    }
+    if (name != null && name.trim().isNotEmpty) {
+      request.fields['name'] = name.trim();
+    }
+    if (rut != null && rut.trim().isNotEmpty) {
+      request.fields['rut'] = rut.trim();
+    }
+    if (email != null && email.trim().isNotEmpty) {
+      request.fields['email'] = email.trim();
+    }
+    if (phone != null && phone.trim().isNotEmpty) {
+      request.fields['phone'] = phone.trim();
+    }
+    if (vehiclePlate != null && vehiclePlate.trim().isNotEmpty) {
+      request.fields['vehiclePlate'] = vehiclePlate.trim().toUpperCase();
+    }
+    if (photo != null) {
+      request.files.add(await http.MultipartFile.fromPath('photo', photo.path));
+    }
+    debugPrint('CREATE INVITATION PAYLOAD');
+    debugPrint('fields: ${request.fields}');
+    debugPrint('files: ${request.files.map((file) => {'field': file.field, 'filename': file.filename, 'length': file.length}).toList()}');
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
     if (response.statusCode != 201) {
       throw Exception(_responseError(response, 'No se pudo crear la invitación.'));
     }
-    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw Exception('El servidor entregó una respuesta inválida al crear la invitación.');
+    }
+    return decoded;
   }
 
   static Future<void> deleteInvitation(String invitationId) async {

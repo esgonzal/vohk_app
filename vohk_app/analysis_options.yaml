@@ -12,6 +12,13 @@ include: package:flutter_lints/flutter.yaml
 analyzer:
   exclude:
     - local_plugins/twilio_voice_vohk/twilio_voice-0.3.2+2/example/**
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
 
 formatter:
   page_width: 175
