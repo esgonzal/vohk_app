@@ -1,5 +1,6 @@
 import 'dart:async';
-
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vohk_app/services/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:vohk_app/services/vohk_api.dart';
 import 'package:vohk_app/screens/intercom_detail_screen.dart';
@@ -16,10 +17,18 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<dynamic> _intercoms = [];
+  List<dynamic> _accessDevices = [];
   List<Map<String, dynamic>> _activities = [];
   bool _loading = true;
   Timer? _activityRefreshTimer;
+  final Set<String> _openingDeviceIds = {};
+  final Set<String> _recentlyOpenedDeviceIds = {};
+  bool _activityExpanded = false;
+  List<String> _favoriteOrder = [];
+  Set<String> _favoriteDeviceIds = {};
+  bool _editingFavorites = false;
+  List<String> _draftFavoriteOrder = [];
+  Set<String> _draftFavoriteDeviceIds = {};
 
   @override
   void initState() {
@@ -44,48 +53,239 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didUpdateWidget(covariant HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.currentUnit?['condominium_id'] != widget.currentUnit?['condominium_id']) {
-      setState(() => _loading = true);
-      _fetchHomeData();
+    final oldLocationId = oldWidget.currentUnit?['unit_id']?.toString() ?? oldWidget.currentUnit?['condominium_id']?.toString();
+    final newLocationId = widget.currentUnit?['unit_id']?.toString() ?? widget.currentUnit?['condominium_id']?.toString();
+    if (oldLocationId != newLocationId) {
+      setState(() {
+        _loading = true;
+        _editingFavorites = false;
+        _favoriteOrder = [];
+        _favoriteDeviceIds = {};
+        _draftFavoriteOrder = [];
+        _draftFavoriteDeviceIds = {};
+      });
+      _fetchHomeData(loadFavoritePreferences: true);
     }
   }
 
   Future<void> _fetchIntercoms() async {
-    await _fetchHomeData();
+    await _fetchHomeData(loadFavoritePreferences: true);
   }
 
-  Future<void> _fetchHomeData() async {
+  Future<void> _fetchHomeData({bool loadFavoritePreferences = false}) async {
     final condominiumId = widget.currentUnit?['condominium_id']?.toString();
     if (condominiumId == null || condominiumId.isEmpty) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
       return;
     }
     try {
       final results = await Future.wait([VohkApi.getDevices(condominiumId: condominiumId), VohkApi.getActivities(condominiumId: condominiumId, limit: 8)]);
       final data = results[0];
       final activities = results[1] as List<Map<String, dynamic>>;
-      if (mounted) {
-        setState(() {
-          _intercoms = data.where((d) => d['type'] == 'intercom').toList();
-          _activities = activities;
-          _loading = false;
-        });
+      final accessDevices = data.where(_isAccessDevice).toList();
+      (List<String>, Set<String>)? favorites;
+      if (loadFavoritePreferences) {
+        favorites = await _loadFavoritePreferences(accessDevices);
       }
+      if (!mounted) return;
+      setState(() {
+        _accessDevices = accessDevices;
+        _activities = activities;
+        if (favorites != null) {
+          _favoriteOrder = favorites.$1;
+          _favoriteDeviceIds = favorites.$2;
+        }
+        _loading = false;
+      });
     } catch (e) {
       debugPrint('❌ Home fetchIntercoms: $e');
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
-  Future<void> _openDoor(dynamic intercom) async {
+  bool _isAccessDevice(dynamic device) {
+    return const {'intercom', 'lock', 'gate'}.contains(device['type']?.toString());
+  }
+
+  Future<void> _openDoor(dynamic device) async {
+    final deviceId = device['device_id']?.toString();
+    if (deviceId == null || deviceId.isEmpty || _openingDeviceIds.contains(deviceId)) {
+      return;
+    }
+    setState(() {
+      _openingDeviceIds.add(deviceId);
+      _recentlyOpenedDeviceIds.remove(deviceId);
+    });
     try {
-      final ok = await VohkApi.openDoor(intercom['device_id'].toString());
+      final ok = await VohkApi.openDoor(deviceId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? '✅ Puerta abierta' : 'No se pudo abrir la puerta')));
-      if (ok) await _fetchHomeData();
+      if (ok) {
+        setState(() {
+          _openingDeviceIds.remove(deviceId);
+          _recentlyOpenedDeviceIds.add(deviceId);
+        });
+        Future.delayed(const Duration(seconds: 2), () {
+          if (!mounted) return;
+          setState(() {
+            _recentlyOpenedDeviceIds.remove(deviceId);
+          });
+        });
+        await _fetchHomeData();
+      } else {
+        setState(() {
+          _openingDeviceIds.remove(deviceId);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo abrir el acceso')));
+      }
     } catch (e) {
       if (!mounted) return;
+      setState(() {
+        _openingDeviceIds.remove(deviceId);
+      });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  String _deviceId(dynamic device) {
+    return device['device_id']?.toString() ?? '';
+  }
+
+  String get _favoritePreferenceScope {
+    final userId = AuthService.userId ?? AuthService.username ?? 'unknown-user';
+    final locationId = widget.currentUnit?['unit_id']?.toString() ?? widget.currentUnit?['condominium_id']?.toString() ?? 'unknown-location';
+    return '${userId}_$locationId';
+  }
+
+  String get _favoriteOrderKey {
+    return 'favorite_access_order_$_favoritePreferenceScope';
+  }
+
+  String get _favoriteSelectedKey {
+    return 'favorite_access_selected_$_favoritePreferenceScope';
+  }
+
+  Future<(List<String>, Set<String>)> _loadFavoritePreferences(List<dynamic> devices) async {
+    final prefs = await SharedPreferences.getInstance();
+    final allIds = <String>[];
+    for (final device in devices) {
+      final id = _deviceId(device);
+      if (id.isNotEmpty && !allIds.contains(id)) {
+        allIds.add(id);
+      }
+    }
+
+    final savedOrder = prefs.getStringList(_favoriteOrderKey);
+    final savedSelected = prefs.getStringList(_favoriteSelectedKey);
+
+    // First time using favorites:
+    // every access is selected by default.
+    if (savedOrder == null || savedSelected == null) {
+      return (List<String>.from(allIds), allIds.toSet());
+    }
+
+    final currentIds = allIds.toSet();
+
+    // Remove devices that no longer exist.
+    final order = savedOrder.where(currentIds.contains).toList();
+
+    final selected = savedSelected.where(currentIds.contains).toSet();
+
+    final previouslyKnown = savedOrder.toSet();
+
+    // If the condominium adds a NEW access later,
+    // append it and make it visible by default.
+    for (final id in allIds) {
+      if (!order.contains(id)) {
+        order.add(id);
+
+        if (!previouslyKnown.contains(id)) {
+          selected.add(id);
+        }
+      }
+    }
+
+    return (order, selected);
+  }
+
+  List<dynamic> _orderedDevices(List<String> order) {
+    final remaining = <String, dynamic>{};
+    for (final device in _accessDevices) {
+      final id = _deviceId(device);
+      if (id.isNotEmpty) {
+        remaining[id] = device;
+      }
+    }
+    final result = <dynamic>[];
+    for (final id in order) {
+      final device = remaining.remove(id);
+      if (device != null) {
+        result.add(device);
+      }
+    }
+    result.addAll(remaining.values);
+    return result;
+  }
+
+  void _startEditingFavorites() {
+    final orderedDevices = _orderedDevices(_favoriteOrder);
+    final allIds = orderedDevices.map(_deviceId).where((id) => id.isNotEmpty).toList();
+    final previouslyKnown = _favoriteOrder.toSet();
+    setState(() {
+      _editingFavorites = true;
+      _draftFavoriteOrder = List<String>.from(allIds);
+      _draftFavoriteDeviceIds = Set<String>.from(_favoriteDeviceIds);
+      for (final id in allIds) {
+        if (!previouslyKnown.contains(id)) {
+          _draftFavoriteDeviceIds.add(id);
+        }
+      }
+    });
+  }
+
+  void _toggleDraftFavorite(String deviceId) {
+    setState(() {
+      if (_draftFavoriteDeviceIds.contains(deviceId)) {
+        _draftFavoriteDeviceIds.remove(deviceId);
+      } else {
+        _draftFavoriteDeviceIds.add(deviceId);
+      }
+    });
+  }
+
+  void _reorderDraftFavorites(int oldIndex, int newIndex) {
+    final currentOrder = _orderedDevices(_draftFavoriteOrder).map(_deviceId).where((id) => id.isNotEmpty).toList();
+    if (newIndex > oldIndex) {
+      newIndex--;
+    }
+    final moved = currentOrder.removeAt(oldIndex);
+    currentOrder.insert(newIndex, moved);
+    setState(() {
+      _draftFavoriteOrder = currentOrder;
+    });
+  }
+
+  Future<void> _saveFavoritePreferences() async {
+    final currentOrder = _orderedDevices(_draftFavoriteOrder).map(_deviceId).where((id) => id.isNotEmpty).toList();
+    final selectedInOrder = currentOrder.where(_draftFavoriteDeviceIds.contains).toList();
+    final orderKey = _favoriteOrderKey;
+    final selectedKey = _favoriteSelectedKey;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(orderKey, currentOrder);
+      await prefs.setStringList(selectedKey, selectedInOrder);
+      if (!mounted) return;
+      setState(() {
+        _favoriteOrder = List<String>.from(currentOrder);
+        _favoriteDeviceIds = selectedInOrder.toSet();
+        _editingFavorites = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo guardar la lista de favoritos.')));
     }
   }
 
@@ -101,19 +301,56 @@ class _HomeScreenState extends State<HomeScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(24, 18, 24, 110),
           children: [
-            const Text(
-              'ACCESOS FAVORITOS',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'ACCESOS FAVORITOS',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _editingFavorites ? _saveFavoritePreferences : _startEditingFavorites,
+                  style: TextButton.styleFrom(
+                    foregroundColor: VohkColors.accent,
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(45, 30),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(_editingFavorites ? 'Listo' : 'Editar', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             _buildAccessCard(),
             const SizedBox(height: 28),
-            const Text(
-              'ACTIVIDAD RECIENTE',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
+            InkWell(
+              onTap: () {
+                setState(() {
+                  _activityExpanded = !_activityExpanded;
+                });
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'ACTIVIDAD RECIENTE',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
+                      ),
+                    ),
+                    AnimatedRotation(
+                      turns: _activityExpanded ? 0.25 : 0,
+                      duration: const Duration(milliseconds: 180),
+                      child: const Icon(Icons.chevron_right_rounded, size: 18, color: VohkColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 12),
-            _buildActivityCard(),
+            if (_activityExpanded) ...[const SizedBox(height: 12), _buildActivityCard()],
           ],
         ),
       ),
@@ -127,7 +364,10 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Center(child: CircularProgressIndicator(color: VohkColors.accent)),
       );
     }
-    if (_intercoms.isEmpty) {
+    final devices = _editingFavorites
+        ? _orderedDevices(_draftFavoriteOrder)
+        : _orderedDevices(_favoriteOrder).where((device) => _favoriteDeviceIds.contains(_deviceId(device))).toList();
+    if (devices.isEmpty && !_editingFavorites) {
       return Container(
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
@@ -136,8 +376,46 @@ class _HomeScreenState extends State<HomeScreen> {
           border: Border.all(color: VohkColors.border),
         ),
         child: const Center(
-          child: Text('Sin accesos disponibles', style: TextStyle(color: VohkColors.textSecondary)),
+          child: Text('No has seleccionado accesos favoritos.', style: TextStyle(color: VohkColors.textSecondary)),
         ),
+      );
+    }
+    if (_editingFavorites) {
+      return ReorderableListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        buildDefaultDragHandles: false,
+        itemCount: devices.length,
+        onReorder: _reorderDraftFavorites,
+        proxyDecorator: (child, index, animation) {
+          return Material(color: Colors.transparent, child: child);
+        },
+        itemBuilder: (context, index) {
+          final device = devices[index];
+          final deviceId = _deviceId(device);
+          return Column(
+            key: ValueKey('favorite-edit-$deviceId'),
+            children: [
+              if (index > 0) const Divider(indent: 64),
+              _AccessRow(
+                device: device,
+                opening: false,
+                opened: false,
+                editing: true,
+                selected: _draftFavoriteDeviceIds.contains(deviceId),
+                onToggleFavorite: () => _toggleDraftFavorite(deviceId),
+                dragHandle: ReorderableDragStartListener(
+                  index: index,
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(Icons.drag_indicator_rounded, color: VohkColors.textSecondary, size: 22),
+                  ),
+                ),
+                onOpen: () {},
+              ),
+            ],
+          );
+        },
       );
     }
     return Container(
@@ -147,15 +425,19 @@ class _HomeScreenState extends State<HomeScreen> {
         border: Border.all(color: VohkColors.border),
       ),
       child: Column(
-        children: List.generate(_intercoms.length, (index) {
-          final intercom = _intercoms[index];
+        children: List.generate(devices.length, (index) {
+          final device = devices[index];
+          final isIntercom = device['type'] == 'intercom';
+          final deviceId = _deviceId(device);
           return Column(
             children: [
               if (index > 0) const Divider(indent: 64),
               _AccessRow(
-                intercom: intercom,
-                onOpen: () => _openDoor(intercom),
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => IntercomDetailScreen(intercom: intercom))),
+                device: device,
+                opening: _openingDeviceIds.contains(deviceId),
+                opened: _recentlyOpenedDeviceIds.contains(deviceId),
+                onOpen: () => _openDoor(device),
+                onTap: isIntercom ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => IntercomDetailScreen(intercom: device))) : null,
               ),
             ],
           );
@@ -280,30 +562,73 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _AccessRow extends StatelessWidget {
-  final dynamic intercom;
+  final dynamic device;
   final VoidCallback onOpen;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool opening;
+  final bool opened;
+  final bool editing;
+  final bool selected;
+  final VoidCallback? onToggleFavorite;
+  final Widget? dragHandle;
 
-  const _AccessRow({required this.intercom, required this.onOpen, required this.onTap});
+  const _AccessRow({
+    required this.device,
+    required this.onOpen,
+    required this.opening,
+    required this.opened,
+    this.onTap,
+    this.editing = false,
+    this.selected = true,
+    this.onToggleFavorite,
+    this.dragHandle,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final name = intercom['name']?.toString().trim().isNotEmpty == true ? intercom['name'].toString() : 'Acceso';
-    final location = intercom['location']?.toString().trim();
+    final type = device['type']?.toString();
+    final name = device['name']?.toString().trim().isNotEmpty == true ? device['name'].toString() : 'Acceso';
+    final zone = device['zone_name']?.toString().trim();
+    final typeLabel = type == 'gate'
+        ? 'Portón'
+        : type == 'lock'
+        ? 'Acceso'
+        : 'Videoportero';
+    final icon = type == 'gate'
+        ? Icons.garage_outlined
+        : type == 'lock'
+        ? Icons.lock_outline
+        : Icons.doorbell_outlined;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       child: Row(
         children: [
+          if (editing) ...[
+            GestureDetector(
+              onTap: onToggleFavorite,
+              child: Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selected ? VohkColors.accent : Colors.transparent,
+                  border: selected ? null : Border.all(color: VohkColors.textSecondary, width: 2),
+                ),
+                child: selected ? const Icon(Icons.check_rounded, size: 15, color: Colors.black) : null,
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
           Container(
             width: 44,
             height: 44,
             decoration: BoxDecoration(color: VohkColors.accentDim, borderRadius: BorderRadius.circular(13)),
-            child: const Icon(Icons.doorbell_outlined, color: VohkColors.accent, size: 22),
+            child: Icon(icon, color: VohkColors.accent, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: InkWell(
-              onTap: onTap,
+              onTap: editing ? onToggleFavorite : onTap,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -315,7 +640,7 @@ class _AccessRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    location != null && location.isNotEmpty ? location : 'Videoportero',
+                    zone != null && zone.isNotEmpty ? '$typeLabel · $zone' : typeLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 12, color: VohkColors.textSecondary),
@@ -325,15 +650,65 @@ class _AccessRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          SizedBox(
-            width: 80,
-            height: 40,
-            child: ElevatedButton(
-              onPressed: onOpen,
-              style: ElevatedButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(80, 40)),
-              child: const Text('Abrir'),
+          if (editing)
+            dragHandle ?? const SizedBox.shrink()
+          else
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              child: opening
+                  ? Container(
+                      key: const ValueKey('opening'),
+                      height: 40,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(color: VohkColors.border),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: VohkColors.textSecondary)),
+                          SizedBox(width: 7),
+                          Text(
+                            'Abriendo...',
+                            style: TextStyle(fontSize: 12, color: VohkColors.textSecondary, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    )
+                  : opened
+                  ? Container(
+                      key: const ValueKey('opened'),
+                      height: 40,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: VohkColors.callGreen.withOpacity(.10),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(color: VohkColors.callGreen),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_rounded, size: 17, color: VohkColors.callGreen),
+                          SizedBox(width: 6),
+                          Text(
+                            'Abierto',
+                            style: TextStyle(fontSize: 12, color: VohkColors.callGreen, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                    )
+                  : SizedBox(
+                      key: const ValueKey('open'),
+                      width: 80,
+                      height: 40,
+                      child: ElevatedButton(
+                        onPressed: onOpen,
+                        style: ElevatedButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(80, 40)),
+                        child: const Text('Abrir'),
+                      ),
+                    ),
             ),
-          ),
         ],
       ),
     );

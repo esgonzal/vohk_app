@@ -157,76 +157,80 @@ class _AdminDirectoryScreenState extends State<AdminDirectoryScreen> {
 
   Widget _unitCard(Map<String, dynamic> unit) {
     final residents = unit['residents'] as List<Map<String, dynamic>>;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
         color: VohkColors.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: VohkColors.border),
-      ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          childrenPadding: EdgeInsets.zero,
-          leading: Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(color: VohkColors.accentDim, borderRadius: BorderRadius.circular(12)),
-            child: const Icon(Icons.apartment_outlined, color: VohkColors.accent, size: 21),
-          ),
-          iconColor: VohkColors.textSecondary,
-          collapsedIconColor: VohkColors.textSecondary,
-          title: Text(
-            unit['unit']?.toString() ?? 'Unidad',
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: VohkColors.textPrimary),
-          ),
-          subtitle: Text(
-            '${unit['building'] ?? ''} · Piso ${unit['floor'] ?? ''} · ${unit['roomNo'] ?? ''}',
-            style: const TextStyle(fontSize: 12, color: VohkColors.textSecondary),
-          ),
-          children: residents.map((resident) {
-            final enabled = resident['active'] == true;
-            final canCall = enabled && resident['sip_identity']?.toString().isNotEmpty == true;
-            return Container(
-              decoration: const BoxDecoration(
-                border: Border(top: BorderSide(color: VohkColors.border)),
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-                leading: CircleAvatar(
-                  radius: 19,
-                  backgroundColor: VohkColors.accentDim,
-                  child: Text(
-                    _initial(resident['legal_name']?.toString()),
-                    style: const TextStyle(color: VohkColors.accent, fontWeight: FontWeight.w700, fontSize: 13),
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: VohkColors.border),
+        ),
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            childrenPadding: EdgeInsets.zero,
+            leading: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(color: VohkColors.accentDim, borderRadius: BorderRadius.circular(12)),
+              child: const Icon(Icons.apartment_outlined, color: VohkColors.accent, size: 21),
+            ),
+            iconColor: VohkColors.textSecondary,
+            collapsedIconColor: VohkColors.textSecondary,
+            title: Text(
+              unit['unit']?.toString() ?? 'Unidad',
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: VohkColors.textPrimary),
+            ),
+            subtitle: Text(
+              '${unit['building'] ?? ''} · Piso ${unit['floor'] ?? ''} · ${unit['roomNo'] ?? ''}',
+              style: const TextStyle(fontSize: 12, color: VohkColors.textSecondary),
+            ),
+            children: residents.map((resident) {
+              final enabled = resident['active'] == true;
+              final canCall = enabled && resident['sip_identity']?.toString().isNotEmpty == true;
+              return Container(
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: VohkColors.border)),
+                ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+                  leading: CircleAvatar(
+                    radius: 19,
+                    backgroundColor: VohkColors.accentDim,
+                    child: Text(
+                      _initial(resident['legal_name']?.toString()),
+                      style: const TextStyle(color: VohkColors.accent, fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+                  ),
+                  title: Text(
+                    resident['legal_name']?.toString() ?? 'Residente',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: enabled ? VohkColors.textPrimary : VohkColors.textMuted),
+                  ),
+                  subtitle: Text(
+                    resident['email']?.toString() ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: VohkColors.textSecondary),
+                  ),
+                  trailing: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(color: VohkColors.callGreen.withOpacity(.15), shape: BoxShape.circle),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: canCall && !_placingCall ? () => _callResident(resident) : null,
+                      icon: const Icon(Icons.call_outlined, size: 19),
+                      color: VohkColors.callGreen,
+                      tooltip: 'Llamar',
+                    ),
                   ),
                 ),
-                title: Text(
-                  resident['legal_name']?.toString() ?? 'Residente',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: enabled ? VohkColors.textPrimary : VohkColors.textMuted),
-                ),
-                subtitle: Text(
-                  resident['email']?.toString() ?? '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11, color: VohkColors.textSecondary),
-                ),
-                trailing: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(color: VohkColors.callGreen.withOpacity(.15), shape: BoxShape.circle),
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: canCall && !_placingCall ? () => _callResident(resident) : null,
-                    icon: const Icon(Icons.call_outlined, size: 19),
-                    color: VohkColors.callGreen,
-                    tooltip: 'Llamar',
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
+              );
+            }).toList(),
+          ),
         ),
       ),
     );

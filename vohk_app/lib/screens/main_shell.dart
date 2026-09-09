@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:vohk_app/screens/cameras_screen.dart';
 import 'package:vohk_app/screens/home_screen.dart';
-import 'package:vohk_app/screens/intercoms_screen.dart';
 import 'package:vohk_app/screens/invitations_screen.dart';
 import 'package:vohk_app/screens/login_screen.dart';
 import 'package:vohk_app/screens/admin_directory_screen.dart';
@@ -46,14 +45,12 @@ class _MainShellState extends State<MainShell> {
     if (_isResident) {
       return [
         HomeScreen(key: ValueKey('home-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
-        IntercomsScreen(key: ValueKey('intercoms-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
         InvitationsScreen(key: ValueKey('invitations-$_currentUnitId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
         if (_residentCameraAccess) CamerasScreen(key: ValueKey('cameras-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
       ];
     }
     return [
       HomeScreen(key: ValueKey('home-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
-      IntercomsScreen(key: ValueKey('intercoms-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
       AdminDirectoryScreen(key: ValueKey('directory-$_currentCondominiumId'), currentCondominium: _currentLocation, onRefreshLocations: _loadLocations),
       InvitationsScreen(key: ValueKey('invitations-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
       CamerasScreen(key: ValueKey('cameras-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
@@ -63,15 +60,13 @@ class _MainShellState extends State<MainShell> {
   List<BottomNavigationBarItem> get _navigationItems {
     if (_isResident) {
       return [
-        const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Inicio'),
-        const BottomNavigationBarItem(icon: Icon(Icons.door_front_door_outlined), activeIcon: Icon(Icons.door_front_door), label: 'Accesos'),
+        const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Accesos'),
         const BottomNavigationBarItem(icon: Icon(Icons.person_add_outlined), activeIcon: Icon(Icons.person_add), label: 'Invitados'),
         if (_residentCameraAccess) const BottomNavigationBarItem(icon: Icon(Icons.videocam_outlined), activeIcon: Icon(Icons.videocam), label: 'Cámaras'),
       ];
     }
     return const [
-      BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Inicio'),
-      BottomNavigationBarItem(icon: Icon(Icons.door_front_door_outlined), activeIcon: Icon(Icons.door_front_door), label: 'Accesos'),
+      BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Accesos'),
       BottomNavigationBarItem(icon: Icon(Icons.groups_outlined), activeIcon: Icon(Icons.groups), label: 'Unidades'),
       BottomNavigationBarItem(icon: Icon(Icons.person_add_outlined), activeIcon: Icon(Icons.person_add), label: 'Invitados'),
       BottomNavigationBarItem(icon: Icon(Icons.videocam_outlined), activeIcon: Icon(Icons.videocam), label: 'Cámaras'),
@@ -503,14 +498,15 @@ class _MainShellState extends State<MainShell> {
           autofocus: true,
           keyboardType: TextInputType.number,
           maxLength: 6,
-          decoration: const InputDecoration(hintText: 'Ingrese 6 dígitos'),
+          decoration: const InputDecoration(hintText: 'Ingrese 6 dígitos', helperText: 'Evita secuencias (123456) y patrones repetidos.'),
           onChanged: (newValue) {
             value = newValue;
           },
           onFieldSubmitted: (submittedValue) {
             final code = submittedValue.trim();
-            if (!RegExp(r'^\d{6}$').hasMatch(code)) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Debe ingresar exactamente 6 números')));
+            final validationError = _dynamicCodeValidationError(code);
+            if (validationError != null) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(validationError)));
               return;
             }
             Navigator.of(dialogContext).pop(code);
@@ -526,8 +522,9 @@ class _MainShellState extends State<MainShell> {
           FilledButton(
             onPressed: () {
               final code = value.trim();
-              if (!RegExp(r'^\d{6}$').hasMatch(code)) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Debe ingresar exactamente 6 números')));
+              final validationError = _dynamicCodeValidationError(code);
+              if (validationError != null) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(validationError)));
                 return;
               }
               Navigator.of(dialogContext).pop(code);
@@ -537,6 +534,24 @@ class _MainShellState extends State<MainShell> {
         ],
       ),
     );
+  }
+
+  String? _dynamicCodeValidationError(String code) {
+    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
+      return 'Debe ingresar exactamente 6 números';
+    }
+    final digits = code.split('').map(int.parse).toList();
+    final isRepeatedDigit = digits.toSet().length == 1;
+    final isAscending = List.generate(digits.length - 1, (index) => index + 1).every((index) => digits[index] == (digits[index - 1] + 1) % 10);
+    final isDescending = List.generate(digits.length - 1, (index) => index + 1).every((index) => digits[index] == (digits[index - 1] + 9) % 10);
+    final isRepeatedPattern = List.generate(code.length ~/ 2, (index) => index + 1).any((patternLength) {
+      if (code.length % patternLength != 0) return false;
+      return List.filled(code.length ~/ patternLength, code.substring(0, patternLength)).join() == code;
+    });
+    if (isRepeatedDigit || isAscending || isDescending || isRepeatedPattern) {
+      return 'TTLock no permite secuencias ni patrones de dígitos repetidos';
+    }
+    return null;
   }
 
   String get _initials {
