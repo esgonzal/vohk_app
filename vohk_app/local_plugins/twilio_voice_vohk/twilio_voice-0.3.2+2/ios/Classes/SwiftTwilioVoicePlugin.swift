@@ -55,6 +55,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         callKitProvider = CXProvider(configuration: configuration)
         callKitCallController = CXCallController()
         super.init()
+        TwilioVoiceSDK.audioDevice = audioDevice
         callObserver.setDelegate(self, queue: DispatchQueue.main)
         callKitProvider.setDelegate(self, queue: nil)
         _ = updateCallKitIcon(icon: defaultIcon)        
@@ -276,7 +277,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             if (self.call != nil) {
                 self.sendPhoneCallEvents(description: "LOG|hangUp method invoked", isError: false)
                 self.userInitiatedDisconnect = true
-                performEndCallAction(uuid: self.call!.uuid!)
+                if self.callOutgoing {
+                    self.call?.disconnect()
+                } else {
+                    performEndCallAction(uuid: self.call!.uuid!)
+                }
                 //self.toggleUIState(isEnabled: false, showCallControl: false)
             } else if(self.callInvite != nil) {
                 performEndCallAction(uuid: self.callInvite!.uuid)
@@ -365,15 +370,20 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     
     func makeCall(to: String){
+        self.callOutgoing = true
         if (self.call != nil) {
             self.userInitiatedDisconnect = true
-            performEndCallAction(uuid: self.call!.uuid!)            
+            if self.callOutgoing {
+                self.call?.disconnect()
+            } else {
+                performEndCallAction(uuid: self.call!.uuid!)
+            }
         } else {
             let uuid = UUID()
             self.checkRecordPermission { (permissionGranted) in
                 if (!permissionGranted) {
                     let alertController: UIAlertController = UIAlertController(title: String(format:  NSLocalizedString("mic_permission_title", comment: "") , SwiftTwilioVoicePlugin.appName),message: NSLocalizedString( "mic_permission_subtitle", comment: ""),preferredStyle: .alert)
-                    let continueWithMic: UIAlertAction = UIAlertAction(title: NSLocalizedString("btn_continue_no_mic", comment: ""), style: .default, handler: { (action) in self.performStartCallAction(uuid: uuid, handle: to)})
+                    let continueWithMic: UIAlertAction = UIAlertAction(title: NSLocalizedString("btn_continue_no_mic", comment: ""), style: .default, handler: { (action) in self.performDirectVoiceCall(uuid: uuid)})
                     alertController.addAction(continueWithMic)
                     let goToSettings: UIAlertAction = UIAlertAction(title:NSLocalizedString("btn_settings", comment: ""), style: .default, handler: { (action) in UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!, options: [UIApplication.OpenExternalURLOptionsKey.universalLinksOnly: false], completionHandler: nil)})
                     alertController.addAction(goToSettings)
@@ -384,7 +394,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
                     }
                     currentViewController.present(alertController, animated: true, completion: nil)                    
                 } else {
-                    self.performStartCallAction(uuid: uuid, handle: to)
+                    self.performDirectVoiceCall(uuid: uuid)
                 }
             }
         }
@@ -603,6 +613,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         if let callKitCompletionCallback = callKitCompletionCallback {
             callKitCompletionCallback(true)
         }
+        if self.callOutgoing {
+            audioDevice.isEnabled = true
+        }
         toggleAudioRoute(toSpeaker: false)
     }
 
@@ -625,7 +638,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         if let completion = self.callKitCompletionCallback {
             completion(false)
         }
-        callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: CXCallEndedReason.failed)
+        if !self.callOutgoing {
+            callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: CXCallEndedReason.failed)
+        }
         callDisconnected()
     }
 
@@ -634,7 +649,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         if let error = error {
             self.sendPhoneCallEvents(description: "Call Failed: \(error.localizedDescription)", isError: true)
         }
-        if !self.userInitiatedDisconnect {
+        if !self.callOutgoing && !self.userInitiatedDisconnect {
             var reason = CXCallEndedReason.remoteEnded
             self.sendPhoneCallEvents(description: "LOG|User initiated disconnect", isError: false)
             if error != nil {
@@ -647,6 +662,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
 
     func callDisconnected() {
         self.sendPhoneCallEvents(description: "LOG|Call Disconnected", isError: false)
+        let wasDirectOutgoingCall = self.callOutgoing
         if (self.call != nil) {
             self.sendPhoneCallEvents(description: "LOG|Setting call to nil", isError: false)
             self.call = nil
@@ -656,6 +672,10 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
         self.callOutgoing = false
         self.userInitiatedDisconnect = false
+        self.callKitCompletionCallback = nil
+        if wasDirectOutgoingCall {
+            audioDevice.isEnabled = false
+        }
     }
 
     func isSpeakerOn() -> Bool {
@@ -800,6 +820,17 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             callUpdate.supportsUngrouping = false
             callUpdate.hasVideo = false
             self.callKitProvider.reportCall(with: uuid, updated: callUpdate)
+        }
+    }
+
+    /// Starts an app-owned outgoing Twilio call without presenting CallKit's
+    /// native outgoing-call interface. Incoming calls still use CallKit.
+    func performDirectVoiceCall(uuid: UUID) {
+        audioDevice.isEnabled = true
+        performVoiceCall(uuid: uuid, client: "") { success in
+            if !success {
+                self.audioDevice.isEnabled = false
+            }
         }
     }
 

@@ -54,7 +54,15 @@ class IncomingCallService {
       return;
     }
     final callSid = payload['call_sid']?.toString();
-    final callType = payload['call_type']?.toString() ?? 'intercom';
+    final rawFrom = payload['from']?.toString().trim();
+    final inferredCallerIdentity = rawFrom != null && rawFrom.toLowerCase().startsWith('client:') ? rawFrom.substring(rawFrom.indexOf(':') + 1).trim() : null;
+    final callerIdentity = payload['caller_identity']?.toString().trim().isNotEmpty == true ? payload['caller_identity'].toString().trim() : inferredCallerIdentity;
+    final explicitCallType = payload['call_type']?.toString().trim();
+    final callType = explicitCallType?.isNotEmpty == true
+        ? explicitCallType!
+        : callerIdentity?.isNotEmpty == true
+        ? 'admin'
+        : 'intercom';
     if (_openingScreen) {
       return;
     }
@@ -93,8 +101,7 @@ class IncomingCallService {
         await navigator.push(MaterialPageRoute(builder: (_) => IncomingCallScreen(intercom: intercom)));
         return;
       }
-      final callerName = payload['caller_name']?.toString() ?? 'Administración';
-      final callerIdentity = payload['caller_identity']?.toString();
+      final callerName = payload['caller_name']?.toString().trim().isNotEmpty == true ? payload['caller_name'].toString().trim() : 'Administración';
       await navigator.push(
         MaterialPageRoute(
           builder: (_) => IncomingClientCallScreen(callerName: callerName, callerIdentity: callerIdentity),

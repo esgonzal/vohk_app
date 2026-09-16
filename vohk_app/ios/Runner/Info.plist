@@ -27,7 +27,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Vöhk Comunidades usa la cámara para registrar o actualizar el reconocimiento facial.</string>
+	<string>Vöhk Comunidades usa la cámara para registrar encomiendas, escanear códigos QR y administrar el reconocimiento facial.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Vöhk Comunidades usa el micrófono para hablar durante las llamadas de citofonía.</string>
 	<key>UIApplicationSceneManifest</key>

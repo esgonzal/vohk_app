@@ -10,6 +10,7 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.media.AudioManager
 import android.telecom.CallAudioState
 import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
@@ -45,6 +46,7 @@ import com.twilio.twilio_voice.types.TelecomManagerExtension.registerPhoneAccoun
 import com.twilio.voice.Call
 import com.twilio.voice.CallException
 import com.twilio.voice.CallInvite
+import com.twilio.voice.ConnectOptions
 import com.twilio.voice.RegistrationException
 import com.twilio.voice.RegistrationListener
 import com.twilio.voice.UnregistrationListener
@@ -90,6 +92,9 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
     // member instance functions
     private var callListener = callListener()
+    private var directOutgoingCall: Call? = null
+    private var directCallAudioManager: AudioManager? = null
+    private var previousAudioMode: Int = AudioManager.MODE_NORMAL
 
     // Constants
     private val kCHANNEL_NAME = "twilio_voice"
@@ -105,7 +110,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     private var isMuted: Boolean = false
     private var isHolding: Boolean = false
     private val callSid: String?
-        get() = TVConnectionService.getActiveCallHandle()
+        get() = directOutgoingCall?.sid ?: TVConnectionService.getActiveCallHandle()
 
     private var hasStarted = false
 
@@ -181,13 +186,15 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
              */
             override fun onRinging(call: Call) {
                 Log.d(TAG, "onRinging")
-                // TODO - outgoing call check
-                val list = arrayOf("Ringing", call.from ?: "", call.to ?: "", "Incoming")
+                directOutgoingCall = call
+                val list = arrayOf("Ringing", call.from ?: "", call.to ?: "", "Outgoing")
                 logEvents("", list)
             }
 
             override fun onConnectFailure(call: Call, error: CallException) {
                 Log.d(TAG, "Connect failure")
+                directOutgoingCall = null
+                deactivateDirectCallAudio()
                 val message = String.format(
                     Locale.getDefault(),
                     "Call Error: %d, %s",
@@ -195,25 +202,33 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                     error.message
                 )
                 logEvent(message)
+                logEvent("", "Call Ended")
             }
 
             override fun onConnected(call: Call) {
                 Log.d(TAG, "onConnected")
-                // TODO - outgoing call check
-                val list = arrayOf("Connected", call.from ?: "", call.to ?: "", "Incoming")
+                directOutgoingCall = call
+                activateDirectCallAudio()
+                val list = arrayOf("Connected", call.from ?: "", call.to ?: "", "Outgoing")
                 logEvents("", list)
             }
 
             override fun onReconnecting(call: Call, callException: CallException) {
                 Log.d(TAG, "onReconnecting")
+                directOutgoingCall = call
+                logEvent("", "Reconnecting")
             }
 
             override fun onReconnected(call: Call) {
                 Log.d(TAG, "onReconnected")
+                directOutgoingCall = call
+                logEvent("", "Reconnected")
             }
 
             override fun onDisconnected(call: Call, error: CallException?) {
                 Log.d(TAG, "Disconnected")
+                directOutgoingCall = null
+                deactivateDirectCallAudio()
                 if (error != null) {
                     val message = String.format(
                         Locale.getDefault(),
@@ -506,8 +521,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
             }
 
             TVMethodChannels.CALL_SID -> {
-                val activeCallHandle = TVConnectionService.getActiveCallHandle();
-                result.success(activeCallHandle)
+                result.success(callSid)
             }
 
             TVMethodChannels.IS_ON_CALL -> {
@@ -621,7 +635,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
                 accessToken?.let { token ->
                     context?.let { ctx ->
-                        val success = placeCall(ctx, token, from, to, params)
+                        val success = placeDirectCall(ctx, token, from, to, params)
                         result.success(success)
                     } ?: run {
                         Log.e(TAG, "Context is null, cannot place call")
@@ -672,7 +686,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
                 accessToken?.let { token ->
                     context?.let { ctx ->
-                        val success = placeCall(ctx, token, from, to, params, connect = true)
+                        val success = placeDirectCall(ctx, token, from, to, params, connect = true)
                         result.success(success)
                     } ?: run {
                         Log.e(TAG, "Context is null, cannot place call")
@@ -990,6 +1004,10 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     //endregion
 
     private fun sendDigits(digits: String): Boolean {
+        directOutgoingCall?.let {
+            it.sendDigits(digits)
+            return true
+        }
         // Send to active call via Intent
         context?.let { ctx ->
             Intent(ctx, TVConnectionService::class.java).apply {
@@ -1018,6 +1036,12 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     }
 
     private fun hangup() {
+        directOutgoingCall?.let {
+            it.disconnect()
+            directOutgoingCall = null
+            deactivateDirectCallAudio()
+            return
+        }
         context?.let { ctx ->
             Intent(ctx, TVConnectionService::class.java).apply {
                 action = TVConnectionService.ACTION_HANGUP
@@ -1041,10 +1065,17 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 //            Log.d(TAG, "isOnCall: CallSid is null.")
 //        }
 //        return tm.isOnCall(ctx)
-        return TVConnectionService.hasActiveCalls()
+        return directOutgoingCall != null || TVConnectionService.hasActiveCalls()
     }
 
     private fun toggleSpeaker(ctx: Context, speakerIsOn: Boolean) {
+        directOutgoingCall?.let {
+            @Suppress("DEPRECATION")
+            (ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager).isSpeakerphoneOn = speakerIsOn
+            isSpeakerOn = speakerIsOn
+            logEvent("", if (speakerIsOn) "Speaker On" else "Speaker Off")
+            return
+        }
         Intent(ctx, TVConnectionService::class.java).apply {
             action = TVConnectionService.ACTION_TOGGLE_SPEAKER
             putExtra(TVConnectionService.EXTRA_SPEAKER_STATE, speakerIsOn)
@@ -1054,6 +1085,12 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     }
 
     private fun toggleMute(ctx: Context, mute: Boolean) {
+        directOutgoingCall?.let {
+            it.mute(mute)
+            isMuted = mute
+            logEvent("", if (mute) "Mute" else "Unmute")
+            return
+        }
         Intent(ctx, TVConnectionService::class.java).apply {
             action = TVConnectionService.ACTION_TOGGLE_MUTE
             putExtra(TVConnectionService.EXTRA_MUTE_STATE, mute)
@@ -1063,6 +1100,16 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     }
 
     private fun toggleBluetooth(ctx: Context, bluetoothOn: Boolean) {
+        directOutgoingCall?.let {
+            @Suppress("DEPRECATION")
+            (ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager).apply {
+                if (bluetoothOn) startBluetoothSco() else stopBluetoothSco()
+                isBluetoothScoOn = bluetoothOn
+            }
+            isBluetoothOn = bluetoothOn
+            logEvent("", if (bluetoothOn) "Bluetooth On" else "Bluetooth Off")
+            return
+        }
         Intent(ctx, TVConnectionService::class.java).apply {
             action = TVConnectionService.ACTION_TOGGLE_BLUETOOTH
             putExtra(TVConnectionService.EXTRA_BLUETOOTH_STATE, bluetoothOn)
@@ -1072,12 +1119,83 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     }
 
     private fun toggleHold(ctx: Context, shouldHold: Boolean) {
+        directOutgoingCall?.let {
+            it.hold(shouldHold)
+            isHolding = shouldHold
+            logEvent("", if (shouldHold) "Hold" else "Unhold")
+            return
+        }
         Intent(ctx, TVConnectionService::class.java).apply {
             action = TVConnectionService.ACTION_TOGGLE_HOLD
             putExtra(TVConnectionService.EXTRA_HOLD_STATE, shouldHold)
             putExtra(TVConnectionService.EXTRA_CALL_HANDLE, callSid)
             ctx.startService(this)
         }
+    }
+
+    /**
+     * Places an outgoing Twilio Voice SDK call without Android Telecom. Incoming
+     * calls continue to use [TVConnectionService] for background/lock-screen support.
+     */
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
+    private fun placeDirectCall(
+        ctx: Context,
+        accessToken: String,
+        from: String?,
+        to: String?,
+        params: Map<String, String>,
+        connect: Boolean = false
+    ): Boolean {
+        if (accessToken.isEmpty()) {
+            Log.e(TAG, "Twilio Access Token cannot be empty")
+            return false
+        }
+        if (!checkMicrophonePermission()) {
+            Log.e(TAG, "No microphone permission, call `requestMicrophonePermission()` first")
+            return false
+        }
+        if (directOutgoingCall != null || TVConnectionService.hasActiveCalls()) {
+            Log.e(TAG, "Cannot place an outgoing call while another call is active")
+            return false
+        }
+
+        val callParams = HashMap<String, String>(params)
+        if (!connect) {
+            if (from.isNullOrBlank() || to.isNullOrBlank()) {
+                Log.e(TAG, "Outgoing calls require non-empty From and To parameters")
+                return false
+            }
+            callParams[Constants.PARAM_FROM] = from
+            callParams[Constants.PARAM_TO] = to
+        }
+
+        Log.d(TAG, "Connecting outgoing call directly through Twilio Voice SDK")
+        directCallAudioManager = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        directOutgoingCall = Voice.connect(
+            ctx.applicationContext,
+            ConnectOptions.Builder(accessToken).params(callParams).build(),
+            callListener
+        )
+        return true
+    }
+
+    private fun activateDirectCallAudio() {
+        directCallAudioManager?.let { manager ->
+            previousAudioMode = manager.mode
+            manager.mode = AudioManager.MODE_IN_COMMUNICATION
+        }
+    }
+
+    private fun deactivateDirectCallAudio() {
+        directCallAudioManager?.let { manager ->
+            @Suppress("DEPRECATION")
+            run { manager.isSpeakerphoneOn = false }
+            manager.mode = previousAudioMode
+        }
+        directCallAudioManager = null
+        isSpeakerOn = false
+        isMuted = false
+        isHolding = false
     }
 
     /**
@@ -1582,6 +1700,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
             )
         } else {
             Log.d(TAG, "requestPermissionForManagingCalls: Manage own calls permission skipped.");
+            onPermissionResult(true)
         }
     }
 

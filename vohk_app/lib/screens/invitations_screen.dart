@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:vohk_app/services/auth_service.dart';
 import 'package:vohk_app/services/vohk_api.dart';
 import '../vohk_theme.dart';
+import '../utils/rut.dart';
 
 class InvitationsScreen extends StatefulWidget {
   final Map<String, dynamic>? currentUnit;
@@ -200,7 +201,9 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
-                        decoration: const InputDecoration(labelText: 'RUT *'),
+                        inputFormatters: const [RutInputFormatter()],
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: const InputDecoration(labelText: 'RUT *', hintText: '12.345.678-5'),
                         onChanged: (value) => rut = value,
                       ),
                       const SizedBox(height: 12),
@@ -322,6 +325,8 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                     validationError = 'Selecciona un residente responsable.';
                   } else if (type != 'express' && (name.trim().isEmpty || rut.trim().isEmpty)) {
                     validationError = 'Nombre y RUT son obligatorios.';
+                  } else if (type != 'express' && !isValidRut(rut)) {
+                    validationError = 'Ingresa un RUT válido.';
                   } else if (type != 'express' && begin.isBefore(DateTime.now().subtract(const Duration(minutes: 1)))) {
                     validationError = 'La fecha de inicio no puede estar en el pasado.';
                   } else if (type == 'temporary' && (!end.isAfter(begin) || end.difference(begin) > Duration(hours: _maxTemporaryHours))) {
@@ -345,7 +350,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                       durationHours: type == 'express' ? expressHours : null,
                       deviceIds: selectedDevices.toList(),
                       name: type == 'express' ? null : name.trim(),
-                      rut: type == 'express' ? null : rut.trim(),
+                      rut: type == 'express' ? null : formatRut(rut),
                       email: email.trim(),
                       phone: phone.trim(),
                       vehiclePlate: vehiclePlate.trim(),

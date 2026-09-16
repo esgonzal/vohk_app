@@ -30,26 +30,31 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
     _callSubscription = TwilioVoice.instance.callEventsListener.listen((event) {
       debugPrint('OUTGOING CALL SCREEN: $event');
       final text = event.toString().toLowerCase();
+      if (event == CallEvent.callEnded || event == CallEvent.declined || text.contains('disconnect') || text.contains('abort')) {
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+        return;
+      }
       if (text.contains('connected')) {
         if (!mounted) return;
         setState(() {
           _connecting = false;
           _connected = true;
         });
-
         return;
-      }
-      if (event == CallEvent.callEnded || event == CallEvent.declined || text.contains('disconnect') || text.contains('abort')) {
-        if (mounted && Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
-        }
       }
     });
   }
 
   Future<void> _startCall() async {
     try {
-      final placed = await TwilioVoice.instance.call.place(from: widget.callerIdentity, to: widget.recipientIdentity);
+      debugPrint('TWILIO OUTGOING: from=${widget.callerIdentity} to=${widget.recipientIdentity}');
+      final placed = await TwilioVoice.instance.call.place(
+        from: widget.callerIdentity,
+        to: widget.recipientIdentity,
+        extraOptions: {'__TWI_RECIPIENT_NAME': widget.recipientName},
+      );
       if (placed != true) {
         throw Exception('No se pudo iniciar la llamada.');
       }

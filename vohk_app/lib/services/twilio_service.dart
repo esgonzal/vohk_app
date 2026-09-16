@@ -101,7 +101,7 @@ class TwilioService {
   static Future<void> _requestCallPermissions() async {
     await TwilioVoice.instance.requestMicAccess();
     if (!Platform.isAndroid) return;
-    await TwilioVoice.instance.requestCallPhonePermission();
+    await TwilioVoice.instance.requestManageOwnCallsPermission();
     await TwilioVoice.instance.requestReadPhoneStatePermission();
     await TwilioVoice.instance.requestReadPhoneNumbersPermission();
     final registered = await TwilioVoice.instance.registerPhoneAccount();

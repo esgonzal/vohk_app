@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -10,10 +11,12 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class NotificationService {
   static bool _initialized = false;
+  static final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   static Stream<String> get onTokenRefresh => FirebaseMessaging.instance.onTokenRefresh;
 
   static Future<void> initialize() async {
     if (_initialized) return;
+    await _localNotifications.initialize(const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher'), iOS: DarwinInitializationSettings()));
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
     _initialized = true;
   }
@@ -54,6 +57,24 @@ class NotificationService {
   static void _handleForegroundMessage(RemoteMessage message) {
     if (message.data['type'] == 'incoming_call') {
       debugPrint('Received incoming-call metadata through Firebase.');
+    }
+    if (message.data['type'] == 'encomienda') {
+      _localNotifications.show(
+        message.hashCode,
+        message.notification?.title ?? 'Encomienda',
+        message.notification?.body ?? 'Tienes una encomienda pendiente.',
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'encomiendas',
+            'Encomiendas',
+            channelDescription: 'Avisos de encomiendas pendientes',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        payload: message.data['encomiendaId'],
+      );
     }
   }
 }

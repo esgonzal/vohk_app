@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:twilio_voice/twilio_voice.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 import '../services/vohk_api.dart';
 import '../widgets/live_camera_view.dart';
 
@@ -12,18 +11,18 @@ class IncomingCallScreen extends StatefulWidget {
   State<IncomingCallScreen> createState() => _IncomingCallScreenState();
 }
 
-class _IncomingCallScreenState extends State<IncomingCallScreen> with WidgetsBindingObserver {
+class _IncomingCallScreenState extends State<IncomingCallScreen> {
   StreamSubscription? _callSubscription;
   bool loadingDoor = false;
+  bool doorOpenedConfirmation = false;
   bool answering = false;
   bool hangingUp = false;
   bool _speakerphoneEnabled = false;
+  bool _allowPop = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    WakelockPlus.enable();
     _listenToCallEvents();
   }
 
@@ -34,11 +33,17 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> with WidgetsBin
         unawaited(_enableSpeakerphone());
       }
       if (event == CallEvent.callEnded || event == CallEvent.declined || event.toString().contains("Abort")) {
-        if (mounted && Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
-        }
+        _closeAfterCallEnded();
       }
     });
+  }
+
+  void _closeAfterCallEnded() {
+    if (!mounted) return;
+    setState(() => _allowPop = true);
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
   }
 
   Future<void> _enableSpeakerphone() async {
@@ -55,24 +60,34 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> with WidgetsBin
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _callSubscription?.cancel();
-    WakelockPlus.disable();
     super.dispose();
   }
 
   Future<void> openDoor() async {
+    if (loadingDoor) return;
     try {
       setState(() => loadingDoor = true);
       final ok = await VohkApi.openDoor(widget.intercom['device_id']);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? 'Puerta abierta' : 'No se pudo abrir la puerta')));
+      if (ok) {
+        setState(() {
+          loadingDoor = false;
+          doorOpenedConfirmation = true;
+        });
+        Future.delayed(const Duration(seconds: 2), () {
+          if (!mounted) return;
+          setState(() => doorOpenedConfirmation = false);
+        });
+      } else {
+        setState(() => loadingDoor = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo abrir la puerta')));
+      }
     } catch (e) {
       debugPrint('OPEN DOOR ERROR: $e');
       if (!mounted) return;
+      setState(() => loadingDoor = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error abriendo puerta: $e')));
-    } finally {
-      if (mounted) setState(() => loadingDoor = false);
     }
   }
 
@@ -105,51 +120,74 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> with WidgetsBin
     final intercom = widget.intercom;
     final intercomName = intercom['name']?.toString() ?? 'Videoportero';
     final condominiumName = intercom['condominium_name']?.toString() ?? '';
-    return Scaffold(
-      appBar: AppBar(title: Text(condominiumName.isEmpty ? intercomName : '$intercomName · $condominiumName')),
-      body: Column(
-        children: [
-          Expanded(child: LiveCameraView(streamUrl: intercom['stream_url'] ?? '')),
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                const Text('Llamada entrante', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text(intercomName, style: const TextStyle(fontSize: 16, color: Colors.grey)),
-                if (condominiumName.isNotEmpty) ...[const SizedBox(height: 4), Text(condominiumName, style: const TextStyle(fontSize: 14, color: Colors.grey))],
-                const SizedBox(height: 20),
-                Row(
+    return PopScope(
+      canPop: _allowPop,
+      child: Scaffold(
+        body: SafeArea(
+          child: Column(
+            children: [
+              Expanded(child: LiveCameraView(streamUrl: intercom['stream_url'] ?? '')),
+              Container(
+                padding: const EdgeInsets.all(16),
+                child: Column(
                   children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: answering ? null : answerCall,
-                        icon: answering ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.call),
-                        label: const Text('Responder', style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: loadingDoor ? null : openDoor,
-                        icon: loadingDoor ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.lock_open),
-                        label: const Text('Abrir', style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: hangingUp ? null : hangUp,
-                        icon: hangingUp ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.call_end),
-                        label: const Text('Colgar', style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
-                      ),
+                    const Text('Llamada entrante', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Text(intercomName, style: const TextStyle(fontSize: 16, color: Colors.grey)),
+                    if (condominiumName.isNotEmpty) ...[const SizedBox(height: 4), Text(condominiumName, style: const TextStyle(fontSize: 14, color: Colors.grey))],
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Tooltip(
+                            message: 'Responder',
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size.fromHeight(48)),
+                              onPressed: answering ? null : answerCall,
+                              child: answering
+                                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Icon(Icons.call),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.yellow.shade700, foregroundColor: Colors.black, minimumSize: const Size.fromHeight(48)),
+                            onPressed: loadingDoor || doorOpenedConfirmation ? null : openDoor,
+                            child: doorOpenedConfirmation
+                                ? const Icon(Icons.check_rounded, size: 26)
+                                : const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.lock_open),
+                                      SizedBox(width: 6),
+                                      Text('Abrir', style: TextStyle(fontSize: 12)),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Tooltip(
+                            message: 'Colgar',
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, minimumSize: const Size.fromHeight(48)),
+                              onPressed: hangingUp ? null : hangUp,
+                              child: hangingUp
+                                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Icon(Icons.call_end),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

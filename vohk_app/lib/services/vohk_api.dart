@@ -185,6 +185,52 @@ class VohkApi {
     }
   }
 
+  static Future<List<Map<String, dynamic>>> getEncomiendas({required String unitId, bool includeHistory = false}) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/encomiendas').replace(queryParameters: {'unitId': unitId, if (includeHistory) 'includeHistory': 'true'});
+    final response = await http.get(uri, headers: _headers());
+    if (response.statusCode != 200) {
+      throw Exception(_responseError(response, 'No se pudieron cargar las encomiendas.'));
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) throw Exception('Respuesta inválida al cargar encomiendas.');
+    return decoded.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+  }
+
+  static Future<Map<String, dynamic>> createEncomienda({required String unitId, required File photo, String? recipientName, String? courierName, String? notes}) async {
+    final request = http.MultipartRequest('POST', Uri.parse('${ApiConfig.baseUrl}/encomiendas'));
+    final token = AuthService.jwt;
+    if (token != null && token.isNotEmpty) request.headers['Authorization'] = 'Bearer $token';
+    request.fields['unitId'] = unitId;
+    if (recipientName?.trim().isNotEmpty == true) request.fields['recipientName'] = recipientName!.trim();
+    if (courierName?.trim().isNotEmpty == true) request.fields['courierName'] = courierName!.trim();
+    if (notes?.trim().isNotEmpty == true) request.fields['notes'] = notes!.trim();
+    request.files.add(await http.MultipartFile.fromPath('photo', photo.path));
+    final response = await http.Response.fromStream(await request.send());
+    if (response.statusCode != 201) {
+      throw Exception(_responseError(response, 'No se pudo registrar la encomienda.'));
+    }
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
+  static Future<Map<String, dynamic>> deliverEncomienda(String claimToken) async {
+    final response = await http.post(Uri.parse('${ApiConfig.baseUrl}/encomiendas/deliver'), headers: _headers(), body: jsonEncode({'claimToken': claimToken}));
+    if (response.statusCode != 200) {
+      throw Exception(_responseError(response, 'No se pudo entregar la encomienda.'));
+    }
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
+  static Future<void> cancelEncomienda(String encomiendaId, String reason) async {
+    final response = await http.post(Uri.parse('${ApiConfig.baseUrl}/encomiendas/$encomiendaId/cancel'), headers: _headers(), body: jsonEncode({'reason': reason}));
+    if (response.statusCode != 200) {
+      throw Exception(_responseError(response, 'No se pudo cancelar la encomienda.'));
+    }
+  }
+
+  static String encomiendaPhotoUrl(String encomiendaId) => '${ApiConfig.baseUrl}/encomiendas/$encomiendaId/photo';
+
+  static Map<String, String> get authenticatedHeaders => _headers();
+
   static Future<List<Map<String, dynamic>>> getActivities({required String condominiumId, int limit = 10}) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}/activities').replace(queryParameters: {'condominiumId': condominiumId, 'limit': limit.toString()});
     final response = await http.get(uri, headers: _headers());

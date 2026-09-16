@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:vohk_app/screens/cameras_screen.dart';
 import 'package:vohk_app/screens/home_screen.dart';
 import 'package:vohk_app/screens/invitations_screen.dart';
+import 'package:vohk_app/screens/encomiendas_screen.dart';
 import 'package:vohk_app/screens/login_screen.dart';
 import 'package:vohk_app/screens/admin_directory_screen.dart';
 import 'package:vohk_app/services/auth_service.dart';
@@ -46,6 +47,7 @@ class _MainShellState extends State<MainShell> {
       return [
         HomeScreen(key: ValueKey('home-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
         InvitationsScreen(key: ValueKey('invitations-$_currentUnitId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
+        EncomiendasScreen(key: ValueKey('encomiendas-$_currentUnitId'), currentLocation: _currentLocation, onRefreshLocations: _loadLocations),
         if (_residentCameraAccess) CamerasScreen(key: ValueKey('cameras-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
       ];
     }
@@ -53,6 +55,7 @@ class _MainShellState extends State<MainShell> {
       HomeScreen(key: ValueKey('home-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
       AdminDirectoryScreen(key: ValueKey('directory-$_currentCondominiumId'), currentCondominium: _currentLocation, onRefreshLocations: _loadLocations),
       InvitationsScreen(key: ValueKey('invitations-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
+      EncomiendasScreen(key: ValueKey('encomiendas-$_currentCondominiumId'), currentLocation: _currentLocation, onRefreshLocations: _loadLocations),
       CamerasScreen(key: ValueKey('cameras-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
     ];
   }
@@ -62,6 +65,7 @@ class _MainShellState extends State<MainShell> {
       return [
         const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Accesos'),
         const BottomNavigationBarItem(icon: Icon(Icons.person_add_outlined), activeIcon: Icon(Icons.person_add), label: 'Invitados'),
+        const BottomNavigationBarItem(icon: Icon(Icons.inventory_2_outlined), activeIcon: Icon(Icons.inventory_2), label: 'Encomiendas'),
         if (_residentCameraAccess) const BottomNavigationBarItem(icon: Icon(Icons.videocam_outlined), activeIcon: Icon(Icons.videocam), label: 'Cámaras'),
       ];
     }
@@ -69,6 +73,7 @@ class _MainShellState extends State<MainShell> {
       BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Accesos'),
       BottomNavigationBarItem(icon: Icon(Icons.groups_outlined), activeIcon: Icon(Icons.groups), label: 'Unidades'),
       BottomNavigationBarItem(icon: Icon(Icons.person_add_outlined), activeIcon: Icon(Icons.person_add), label: 'Invitados'),
+      BottomNavigationBarItem(icon: Icon(Icons.inventory_2_outlined), activeIcon: Icon(Icons.inventory_2), label: 'Encomiendas'),
       BottomNavigationBarItem(icon: Icon(Icons.videocam_outlined), activeIcon: Icon(Icons.videocam), label: 'Cámaras'),
     ];
   }

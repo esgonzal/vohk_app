@@ -758,10 +758,22 @@ class TVConnectionService : ConnectionService() {
             ?: callInvite.from
                 ?.takeIf { it.isNotBlank() }
             ?: "Vöhk"
+        val clientIdentity = callInvite.from
+            ?.trim()
+            ?.takeIf { it.startsWith("client:", ignoreCase = true) }
+            ?.substringAfter(':')
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+        val callType = callInvite.customParameters["call_type"]
+            ?.takeIf { it.isNotBlank() }
+            ?: if (clientIdentity != null) "admin" else "intercom"
         launchIntent.apply {
             action = ACTION_OPEN_INCOMING_CALL
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra(EXTRA_CALL_HANDLE, callInvite.callSid)
+            putExtra("call_type", callType)
+            callInvite.from?.takeIf { it.isNotBlank() }?.let { putExtra("from", it) }
+            clientIdentity?.let { putExtra("caller_identity", it) }
             callInvite.customParameters.forEach { (key, value) -> putExtra(key, value) }
         }
         val pendingIntentFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
