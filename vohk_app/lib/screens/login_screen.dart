@@ -43,15 +43,15 @@ class _LoginScreenState extends State<LoginScreen> {
       });
       return;
     }
-    if (Platform.isAndroid) {
+    if (Platform.isAndroid || Platform.isIOS) {
       try {
         fcmToken = await NotificationService.requestPermissionAndGetToken();
         await AuthService.registerFcmToken(fcmToken);
       } catch (error, stackTrace) {
-        debugPrint('Android notification setup failed: $error');
+        debugPrint('${Platform.isIOS ? 'iOS' : 'Android'} notification setup failed: $error');
         debugPrintStack(stackTrace: stackTrace);
       }
-      if (fcmToken == null) {
+      if (Platform.isAndroid && fcmToken == null) {
         await AuthService.logout();
         if (!mounted) return;
         setState(() {
@@ -62,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }
     try {
-      await TwilioService.initialize(jwt: AuthService.jwt!, identity: AuthService.identity!, deviceToken: fcmToken);
+      await TwilioService.initialize(jwt: AuthService.jwt!, identity: AuthService.identity!, deviceToken: Platform.isAndroid ? fcmToken : null);
     } catch (error, stackTrace) {
       debugPrint('Twilio device setup failed: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -74,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
         debugPrint('Twilio cleanup failed: $cleanupError');
         debugPrintStack(stackTrace: cleanupStackTrace);
       }
-      if (Platform.isAndroid && fcmToken != null) {
+      if ((Platform.isAndroid || Platform.isIOS) && fcmToken != null) {
         try {
           await AuthService.unregisterFcmToken(fcmToken);
         } catch (cleanupError, cleanupStackTrace) {

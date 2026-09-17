@@ -81,7 +81,7 @@ class _AdminDirectoryScreenState extends State<AdminDirectoryScreen> {
     if (_placingCall) return;
     final callerIdentity = AuthService.identity;
     if (callerIdentity == null || callerIdentity.isEmpty) {
-      _showMessage('No se encontró la identidad del administrador.');
+      _showMessage('No se encontró tu identidad de llamada.');
       return;
     }
     if (recipientIdentity.isEmpty) {

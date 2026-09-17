@@ -15,7 +15,7 @@ StreamSubscription<String>? _tokenRefreshSubscription;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (Platform.isAndroid) {
+  if (Platform.isAndroid || Platform.isIOS) {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     await NotificationService.initialize();
@@ -25,11 +25,17 @@ Future<void> main() async {
   if (hasSession) {
     String? fcmToken;
     try {
-      if (Platform.isAndroid) {
-        fcmToken = await NotificationService.requestPermissionAndGetToken();
-        await AuthService.registerFcmToken(fcmToken);
+      if (Platform.isAndroid || Platform.isIOS) {
+        try {
+          fcmToken = await NotificationService.requestPermissionAndGetToken();
+          await AuthService.registerFcmToken(fcmToken);
+        } catch (error, stackTrace) {
+          debugPrint('${Platform.isIOS ? 'iOS' : 'Android'} notification setup failed: $error');
+          debugPrintStack(stackTrace: stackTrace);
+          if (Platform.isAndroid) rethrow;
+        }
       }
-      await TwilioService.initialize(jwt: AuthService.jwt!, identity: AuthService.identity!, deviceToken: fcmToken);
+      await TwilioService.initialize(jwt: AuthService.jwt!, identity: AuthService.identity!, deviceToken: Platform.isAndroid ? fcmToken : null);
     } catch (error, stackTrace) {
       debugPrint('Saved-session device initialization failed: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -41,7 +47,7 @@ Future<void> main() async {
         debugPrint('Twilio cleanup failed: $cleanupError');
         debugPrintStack(stackTrace: cleanupStackTrace);
       }
-      if (Platform.isAndroid && fcmToken != null) {
+      if ((Platform.isAndroid || Platform.isIOS) && fcmToken != null) {
         try {
           await AuthService.unregisterFcmToken(fcmToken);
         } catch (cleanupError, cleanupStackTrace) {
@@ -59,7 +65,7 @@ Future<void> main() async {
 }
 
 Future<void> _handleFcmTokenRefresh(String newToken) async {
-  if (!Platform.isAndroid) {
+  if (!Platform.isAndroid && !Platform.isIOS) {
     return;
   }
   final jwt = AuthService.jwt;
@@ -68,7 +74,7 @@ Future<void> _handleFcmTokenRefresh(String newToken) async {
   }
   try {
     await AuthService.registerFcmToken(newToken);
-    if (TwilioService.initialized) {
+    if (Platform.isAndroid && TwilioService.initialized) {
       await TwilioService.refreshDeviceRegistration(jwt: jwt, deviceToken: newToken);
     }
   } catch (error, stackTrace) {

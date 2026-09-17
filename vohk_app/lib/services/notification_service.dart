@@ -16,7 +16,12 @@ class NotificationService {
 
   static Future<void> initialize() async {
     if (_initialized) return;
-    await _localNotifications.initialize(const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher'), iOS: DarwinInitializationSettings()));
+    await _localNotifications.initialize(
+      const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        iOS: DarwinInitializationSettings(requestAlertPermission: false, requestBadgePermission: false, requestSoundPermission: false),
+      ),
+    );
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
     _initialized = true;
   }
@@ -36,12 +41,12 @@ class NotificationService {
   static Future<String> _getRequiredToken() async {
     if (Platform.isIOS) {
       String? apnsToken;
-      for (var attempt = 0; attempt < 10; attempt++) {
+      for (var attempt = 0; attempt < 20; attempt++) {
         apnsToken = await FirebaseMessaging.instance.getAPNSToken();
         if (apnsToken != null && apnsToken.isNotEmpty) {
           break;
         }
-        await Future<void>.delayed(const Duration(milliseconds: 300));
+        await Future<void>.delayed(const Duration(milliseconds: 250));
       }
       if (apnsToken == null || apnsToken.isEmpty) {
         throw Exception('Firebase could not obtain the APNs token.');

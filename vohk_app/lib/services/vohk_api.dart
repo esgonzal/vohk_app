@@ -2,11 +2,42 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'api_config.dart';
 import 'auth_service.dart';
 import 'package:flutter/foundation.dart';
 
 class VohkApi {
+  static Future<MediaType> _packagePhotoMediaType(File photo) async {
+    final header = await photo.openRead(0, 12).fold<List<int>>(<int>[], (bytes, chunk) => bytes..addAll(chunk));
+    if (header.length >= 3 && header[0] == 0xff && header[1] == 0xd8 && header[2] == 0xff) {
+      return MediaType('image', 'jpeg');
+    }
+    if (header.length >= 8 &&
+        header[0] == 0x89 &&
+        header[1] == 0x50 &&
+        header[2] == 0x4e &&
+        header[3] == 0x47 &&
+        header[4] == 0x0d &&
+        header[5] == 0x0a &&
+        header[6] == 0x1a &&
+        header[7] == 0x0a) {
+      return MediaType('image', 'png');
+    }
+    if (header.length >= 12 &&
+        header[0] == 0x52 &&
+        header[1] == 0x49 &&
+        header[2] == 0x46 &&
+        header[3] == 0x46 &&
+        header[8] == 0x57 &&
+        header[9] == 0x45 &&
+        header[10] == 0x42 &&
+        header[11] == 0x50) {
+      return MediaType('image', 'webp');
+    }
+    throw Exception('La foto debe estar en formato JPEG, PNG o WebP.');
+  }
+
   static Future<List<Map<String, dynamic>>> getAdminCondominiums() async {
     final response = await http.get(Uri.parse('${ApiConfig.baseUrl}/condominiums/mobile'), headers: _headers());
     if (response.statusCode != 200) {
@@ -204,7 +235,7 @@ class VohkApi {
     if (recipientName?.trim().isNotEmpty == true) request.fields['recipientName'] = recipientName!.trim();
     if (courierName?.trim().isNotEmpty == true) request.fields['courierName'] = courierName!.trim();
     if (notes?.trim().isNotEmpty == true) request.fields['notes'] = notes!.trim();
-    request.files.add(await http.MultipartFile.fromPath('photo', photo.path));
+    request.files.add(await http.MultipartFile.fromPath('photo', photo.path, contentType: await _packagePhotoMediaType(photo)));
     final response = await http.Response.fromStream(await request.send());
     if (response.statusCode != 201) {
       throw Exception(_responseError(response, 'No se pudo registrar la encomienda.'));

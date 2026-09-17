@@ -136,17 +136,17 @@ class _MainShellState extends State<MainShell> {
   Future<void> _logout() async {
     final jwt = AuthService.jwt;
     String? fcmToken;
-    if (Platform.isAndroid) {
+    if (Platform.isAndroid || Platform.isIOS) {
       try {
         fcmToken = await NotificationService.getToken().timeout(
           const Duration(seconds: 3),
           onTimeout: () {
-            debugPrint('Timed out getting Android FCM token during logout.');
+            debugPrint('Timed out getting FCM token during logout.');
             return null;
           },
         );
       } catch (error) {
-        debugPrint('Could not get Android FCM token during logout: $error');
+        debugPrint('Could not get FCM token during logout: $error');
       }
     }
     if (jwt != null && jwt.isNotEmpty) {
@@ -155,7 +155,7 @@ class _MainShellState extends State<MainShell> {
       } catch (error) {
         debugPrint('Twilio unregistration failed: $error');
       }
-      if (Platform.isAndroid && fcmToken != null && fcmToken.isNotEmpty) {
+      if ((Platform.isAndroid || Platform.isIOS) && fcmToken != null && fcmToken.isNotEmpty) {
         try {
           await AuthService.unregisterFcmToken(fcmToken).timeout(const Duration(seconds: 3));
         } catch (error) {
