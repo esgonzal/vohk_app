@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -11,15 +10,19 @@ import 'package:vohk_app/services/incoming_call_service.dart';
 import 'screens/login_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-StreamSubscription<String>? _tokenRefreshSubscription;
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (Platform.isAndroid || Platform.isIOS) {
-    await Firebase.initializeApp();
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-    await NotificationService.initialize();
-    _tokenRefreshSubscription = NotificationService.onTokenRefresh.listen(_handleFcmTokenRefresh);
+    try {
+      await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      await NotificationService.initialize();
+      NotificationService.onTokenRefresh.listen(_handleFcmTokenRefresh);
+    } catch (error, stackTrace) {
+      debugPrint('${Platform.isIOS ? 'iOS' : 'Android'} Firebase initialization failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (Platform.isAndroid) rethrow;
+    }
   }
   var hasSession = await AuthService.restoreSession();
   if (hasSession) {
