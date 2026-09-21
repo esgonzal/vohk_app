@@ -216,8 +216,13 @@ class VohkApi {
     }
   }
 
-  static Future<List<Map<String, dynamic>>> getEncomiendas({required String unitId, bool includeHistory = false}) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}/encomiendas').replace(queryParameters: {'unitId': unitId, if (includeHistory) 'includeHistory': 'true'});
+  static Future<List<Map<String, dynamic>>> getEncomiendas({String? unitId, String? condominiumId, bool includeHistory = false}) async {
+    if ((unitId == null) == (condominiumId == null)) {
+      throw ArgumentError('Se debe indicar una unidad o un condominio.');
+    }
+    final uri = Uri.parse('${ApiConfig.baseUrl}/encomiendas').replace(
+      queryParameters: {if (unitId != null) 'unitId': unitId, if (condominiumId != null) 'condominiumId': condominiumId, if (includeHistory) 'includeHistory': 'true'},
+    );
     final response = await http.get(uri, headers: _headers());
     if (response.statusCode != 200) {
       throw Exception(_responseError(response, 'No se pudieron cargar las encomiendas.'));

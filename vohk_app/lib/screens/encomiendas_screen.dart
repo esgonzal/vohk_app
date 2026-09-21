@@ -21,12 +21,14 @@ class EncomiendasScreen extends StatefulWidget {
 
 class _EncomiendasScreenState extends State<EncomiendasScreen> {
   final bool _isResident = AuthService.role == 'resident';
+  final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _encomiendas = [];
   List<Map<String, dynamic>> _units = [];
   Map<String, dynamic>? _selectedUnit;
   bool _loading = true;
   bool _includeHistory = false;
   bool _submitting = false;
+  String _searchQuery = '';
   int _loadGeneration = 0;
   Timer? _claimRefreshTimer;
 
@@ -59,7 +61,35 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
   @override
   void dispose() {
     _claimRefreshTimer?.cancel();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  List<Map<String, dynamic>> get _visibleEncomiendas {
+    final terms = _searchQuery.trim().toLowerCase().split(RegExp(r'\s+')).where((term) => term.isNotEmpty);
+    if (terms.isEmpty) return _encomiendas;
+    return _encomiendas.where((item) {
+      final status = item['status']?.toString();
+      final statusLabel = status == 'delivered'
+          ? 'entregada'
+          : status == 'cancelled'
+          ? 'cancelada'
+          : 'pendiente';
+      final searchable = [
+        item['unit_name'],
+        item['room_no'],
+        item['building_name'],
+        item['recipient_name'],
+        item['courier_name'],
+        item['notes'],
+        item['created_by_name'],
+        item['delivered_by_name'],
+        item['delivered_to_resident_name'],
+        status,
+        statusLabel,
+      ].where((value) => value != null).join(' ').toLowerCase();
+      return terms.every(searchable.contains);
+    }).toList();
   }
 
   List<Map<String, dynamic>> _buildUnits(List<Map<String, dynamic>> residents) {
@@ -88,8 +118,9 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
         _selectedUnit = units.isEmpty ? null : units.firstWhere((item) => item['unit_id'] == previousId, orElse: () => units.first);
         _units = units;
       }
-      final unitId = _unitId;
-      final items = unitId == null ? <Map<String, dynamic>>[] : await VohkApi.getEncomiendas(unitId: unitId, includeHistory: _includeHistory);
+      final items = _isResident
+          ? (_unitId == null ? <Map<String, dynamic>>[] : await VohkApi.getEncomiendas(unitId: _unitId, includeHistory: _includeHistory))
+          : (_condominiumId == null ? <Map<String, dynamic>>[] : await VohkApi.getEncomiendas(condominiumId: _condominiumId, includeHistory: _includeHistory));
       if (!mounted || generation != _loadGeneration) return;
       setState(() => _encomiendas = items);
     } catch (error) {
@@ -231,39 +262,29 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
     }
   }
 
-  Future<void> _showClaim(Map<String, dynamic> encomienda) async {
-    await _loadData(silent: true);
-    if (!mounted) return;
-    final current = _encomiendas.cast<Map<String, dynamic>?>().firstWhere((item) => item?['encomienda_id'] == encomienda['encomienda_id'], orElse: () => null);
-    final token = current?['claim_token']?.toString();
-    if (token == null) {
-      _showMessage('Esta encomienda ya no está pendiente.');
-      return;
+  Future<void> _openPackageDetails(Map<String, dynamic> encomienda) async {
+    var current = encomienda;
+    final status = encomienda['status']?.toString() ?? 'pending';
+    if (_isResident && status == 'pending') {
+      await _loadData(silent: true);
+      if (!mounted) return;
+      final refreshed = _encomiendas.cast<Map<String, dynamic>?>().firstWhere((item) => item?['encomienda_id'] == encomienda['encomienda_id'], orElse: () => null);
+      if (refreshed == null || refreshed['claim_token']?.toString().isNotEmpty != true) {
+        _showMessage('Esta encomienda ya no está pendiente.');
+        return;
+      }
+      current = refreshed;
     }
-    await showDialog<void>(
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        title: const Text('Código de retiro', style: TextStyle(color: Colors.black)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            QrImageView(data: token, size: 245, backgroundColor: Colors.white),
-            const SizedBox(height: 12),
-            Text(
-              '${current?['building_name']} · ${current?['unit_name']}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Muestra este código al personal. Caduca en 5 minutos.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.black54),
-            ),
-          ],
-        ),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar'))],
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      backgroundColor: VohkColors.surface,
+      builder: (sheetContext) => SizedBox(
+        height: MediaQuery.sizeOf(sheetContext).height * .86,
+        child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 28), child: _packageDetails(current, sheetContext)),
       ),
     );
   }
@@ -299,6 +320,7 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final visibleEncomiendas = _visibleEncomiendas;
     return Scaffold(
       backgroundColor: VohkColors.background,
       body: RefreshIndicator(
@@ -319,10 +341,10 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
                 padding: EdgeInsets.only(top: 100),
                 child: Center(child: CircularProgressIndicator(color: VohkColors.accent)),
               )
-            else if (_encomiendas.isEmpty)
-              _emptyState()
+            else if (visibleEncomiendas.isEmpty)
+              _emptyState(filtered: _encomiendas.isNotEmpty && _searchQuery.trim().isNotEmpty)
             else
-              ..._encomiendas.map(_packageCard),
+              ...visibleEncomiendas.map(_packageCard),
           ],
         ),
       ),
@@ -344,17 +366,25 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        if (_units.isNotEmpty)
-          DropdownButtonFormField<String>(
-            initialValue: _selectedUnit?['unit_id']?.toString(),
-            decoration: const InputDecoration(labelText: 'Unidad'),
-            items: _units.map((unit) => DropdownMenuItem(value: unit['unit_id']?.toString(), child: Text('${unit['building_name']} · ${unit['name']}'))).toList(),
-            onChanged: (id) {
-              if (id == null) return;
-              setState(() => _selectedUnit = _units.firstWhere((item) => item['unit_id'] == id));
-              _loadData();
-            },
+        TextField(
+          controller: _searchController,
+          decoration: InputDecoration(
+            hintText: 'Buscar unidad, edificio, nombre…',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _searchQuery.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Limpiar búsqueda',
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                    icon: const Icon(Icons.close),
+                  ),
           ),
+          textInputAction: TextInputAction.search,
+          onChanged: (value) => setState(() => _searchQuery = value),
+        ),
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
           title: const Text('Mostrar historial', style: TextStyle(fontSize: 14)),
@@ -370,7 +400,7 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
     );
   }
 
-  Widget _emptyState() {
+  Widget _emptyState({bool filtered = false}) {
     return Padding(
       padding: const EdgeInsets.only(top: 90),
       child: Column(
@@ -378,7 +408,11 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
           Icon(_isResident ? Icons.inventory_2_outlined : Icons.inbox_outlined, color: VohkColors.textMuted, size: 54),
           const SizedBox(height: 14),
           Text(
-            _isResident ? 'No tienes encomiendas pendientes.' : (_includeHistory ? 'No hay encomiendas registradas.' : 'No hay encomiendas pendientes.'),
+            filtered
+                ? 'No hay encomiendas que coincidan con la búsqueda.'
+                : _isResident
+                ? 'No tienes encomiendas pendientes.'
+                : (_includeHistory ? 'No hay encomiendas registradas.' : 'No hay encomiendas pendientes.'),
             style: const TextStyle(color: VohkColors.textSecondary),
             textAlign: TextAlign.center,
           ),
@@ -390,65 +424,170 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
   Widget _packageCard(Map<String, dynamic> item) {
     final status = item['status']?.toString() ?? 'pending';
     final created = DateTime.tryParse(item['created_at']?.toString() ?? '')?.toLocal();
-    return Card(
-      margin: const EdgeInsets.only(bottom: 14),
+    final recipient = _value(item, 'recipient_name');
+    final building = _value(item, 'building_name');
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: VohkColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: VohkColors.border),
+      ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            height: 165,
-            width: double.infinity,
-            child: Image.network(
-              VohkApi.encomiendaPhotoUrl(item['encomienda_id'].toString()),
-              headers: VohkApi.authenticatedHeaders,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const ColoredBox(
-                color: VohkColors.surfaceAlt,
-                child: Icon(Icons.broken_image_outlined, color: VohkColors.textMuted, size: 42),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openPackageDetails(item),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
               children: [
-                Row(
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(11),
+                  child: SizedBox(width: 62, height: 62, child: _packagePhoto(item, fit: BoxFit.cover)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item['unit_name']?.toString() ?? 'Unidad',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, height: 1.1),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        [if (building != null) building, recipient == null ? _formatDate(created) : 'Para $recipient'].join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: VohkColors.textSecondary, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Expanded(
-                      child: Text('${item['building_name']} · ${item['unit_name']}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                    ),
                     _statusChip(status),
+                    const SizedBox(height: 8),
+                    const Icon(Icons.chevron_right_rounded, color: VohkColors.textMuted, size: 20),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text('Recibida ${_formatDate(created)} por ${item['created_by_name'] ?? 'personal'}', style: const TextStyle(color: VohkColors.textSecondary, fontSize: 12)),
-                if (item['recipient_name'] != null) _detail(Icons.person_outline, 'A nombre de ${item['recipient_name']}'),
-                if (item['courier_name'] != null) _detail(Icons.local_shipping_outlined, item['courier_name'].toString()),
-                if (item['notes'] != null) _detail(Icons.notes, item['notes'].toString()),
-                if (status == 'delivered')
-                  _detail(
-                    Icons.verified_outlined,
-                    'Entregada por ${item['delivered_by_name']} a ${item['delivered_to_resident_name']} · ${_formatDate(DateTime.tryParse(item['delivered_at']?.toString() ?? '')?.toLocal())}',
-                  ),
-                if (status == 'cancelled') _detail(Icons.cancel_outlined, 'Cancelada: ${item['cancellation_reason'] ?? 'sin motivo'}'),
-                if (status == 'pending') ...[
-                  const SizedBox(height: 14),
-                  if (_isResident)
-                    FilledButton.icon(onPressed: () => _showClaim(item), icon: const Icon(Icons.qr_code_2), label: const Text('Mostrar QR de retiro'))
-                  else
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(onPressed: () => _cancel(item), icon: const Icon(Icons.cancel_outlined), label: const Text('Cancelar')),
-                    ),
-                ],
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
+  }
+
+  Widget _packageDetails(Map<String, dynamic> item, BuildContext sheetContext) {
+    final status = item['status']?.toString() ?? 'pending';
+    final created = DateTime.tryParse(item['created_at']?.toString() ?? '')?.toLocal();
+    final recipient = _value(item, 'recipient_name');
+    final courier = _value(item, 'courier_name');
+    final notes = _value(item, 'notes');
+    final claimToken = _value(item, 'claim_token');
+    final deliveredAt = DateTime.tryParse(item['delivered_at']?.toString() ?? '')?.toLocal();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_isResident && status == 'pending' && claimToken != null) ...[
+          Center(
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Código de retiro',
+                    style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 10),
+                  QrImageView(data: claimToken, size: 220, backgroundColor: Colors.white),
+                  const SizedBox(height: 8),
+                  const SizedBox(
+                    width: 250,
+                    child: Text(
+                      'Muestra este código al personal. Caduca en 5 minutos.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.black54, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+        ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: AspectRatio(
+            aspectRatio: 16 / 10,
+            child: _packagePhoto(item, fit: BoxFit.cover),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text('${item['building_name']} · ${item['unit_name']}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+            ),
+            const SizedBox(width: 12),
+            _statusChip(status),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text('Recibida ${_formatDate(created)} por ${item['created_by_name'] ?? 'personal'}', style: const TextStyle(color: VohkColors.textSecondary, fontSize: 13)),
+        if (recipient != null) _detail(Icons.person_outline, 'A nombre de $recipient'),
+        if (courier != null) _detail(Icons.local_shipping_outlined, courier),
+        if (notes != null) _detail(Icons.notes, notes),
+        if (status == 'delivered')
+          _detail(
+            Icons.verified_outlined,
+            'Entregada por ${item['delivered_by_name'] ?? 'personal'} a ${item['delivered_to_resident_name'] ?? 'residente'} · ${_formatDate(deliveredAt)}',
+          ),
+        if (status == 'cancelled') _detail(Icons.cancel_outlined, 'Cancelada: ${item['cancellation_reason'] ?? 'sin motivo'}'),
+        if (!_isResident && status == 'pending') ...[
+          const SizedBox(height: 22),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.pop(sheetContext);
+                _cancel(item);
+              },
+              icon: const Icon(Icons.cancel_outlined),
+              label: const Text('Cancelar encomienda'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _packagePhoto(Map<String, dynamic> item, {required BoxFit fit}) {
+    return Image.network(
+      VohkApi.encomiendaPhotoUrl(item['encomienda_id'].toString()),
+      headers: VohkApi.authenticatedHeaders,
+      width: double.infinity,
+      height: double.infinity,
+      fit: fit,
+      errorBuilder: (_, __, ___) => const ColoredBox(
+        color: VohkColors.surfaceAlt,
+        child: Center(child: Icon(Icons.broken_image_outlined, color: VohkColors.textMuted, size: 34)),
+      ),
+    );
+  }
+
+  String? _value(Map<String, dynamic> item, String key) {
+    final value = item[key]?.toString().trim();
+    return value == null || value.isEmpty ? null : value;
   }
 
   Widget _detail(IconData icon, String text) => Padding(
