@@ -834,45 +834,84 @@ class _MainShellState extends State<MainShell> {
     final tabs = _tabs;
     final navigationItems = _navigationItems;
     final safeIndex = _currentIndex < tabs.length ? _currentIndex : 0;
-    return Scaffold(
-      backgroundColor: VohkColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            _buildAppHeader(),
-            Expanded(
-              child: !_locationsLoaded
-                  ? const Center(child: CircularProgressIndicator(color: VohkColors.accent))
-                  : _currentLocation == null
-                  ? Center(child: Text(_isResident ? 'No tienes propiedades asignadas.' : 'No tienes condominios asignados.'))
-                  : IndexedStack(index: safeIndex, children: tabs),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.black,
-          border: Border(top: BorderSide(color: VohkColors.border)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: BottomNavigationBar(
-            currentIndex: safeIndex,
-            onTap: (index) => setState(() => _currentIndex = index),
-            backgroundColor: Colors.black,
-            selectedItemColor: VohkColors.accent,
-            unselectedItemColor: const Color(0xFF7A7A7E),
-            type: BottomNavigationBarType.fixed,
-            elevation: 0,
-            selectedFontSize: 10,
-            unselectedFontSize: 10,
-            iconSize: 23,
-            items: navigationItems,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useNavigationRail = constraints.maxWidth >= 900;
+        final tablet = constraints.maxWidth >= 600;
+        final content = SafeArea(
+          bottom: useNavigationRail,
+          child: Column(
+            children: [
+              if (tablet)
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 1100), child: _buildAppHeader()),
+                )
+              else
+                _buildAppHeader(),
+              Expanded(
+                child: !_locationsLoaded
+                    ? const Center(child: CircularProgressIndicator(color: VohkColors.accent))
+                    : _currentLocation == null
+                    ? Center(child: Text(_isResident ? 'No tienes propiedades asignadas.' : 'No tienes condominios asignados.'))
+                    : IndexedStack(index: safeIndex, children: tabs),
+              ),
+            ],
           ),
-        ),
-      ),
+        );
+
+        return Scaffold(
+          backgroundColor: VohkColors.background,
+          body: useNavigationRail
+              ? Row(
+                  children: [
+                    SafeArea(
+                      right: false,
+                      child: NavigationRail(
+                        backgroundColor: Colors.black,
+                        selectedIndex: safeIndex,
+                        onDestinationSelected: (index) => setState(() => _currentIndex = index),
+                        labelType: NavigationRailLabelType.all,
+                        selectedIconTheme: const IconThemeData(color: VohkColors.accent, size: 25),
+                        unselectedIconTheme: const IconThemeData(color: Color(0xFF7A7A7E), size: 23),
+                        selectedLabelTextStyle: const TextStyle(color: VohkColors.accent, fontSize: 11, fontWeight: FontWeight.w700),
+                        unselectedLabelTextStyle: const TextStyle(color: Color(0xFF7A7A7E), fontSize: 10),
+                        destinations: navigationItems
+                            .map((item) => NavigationRailDestination(icon: item.icon, selectedIcon: item.activeIcon, label: Text(item.label ?? '')))
+                            .toList(),
+                      ),
+                    ),
+                    const VerticalDivider(width: 1, thickness: 1, color: VohkColors.border),
+                    Expanded(child: content),
+                  ],
+                )
+              : content,
+          bottomNavigationBar: useNavigationRail
+              ? null
+              : Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.black,
+                    border: Border(top: BorderSide(color: VohkColors.border)),
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: BottomNavigationBar(
+                      currentIndex: safeIndex,
+                      onTap: (index) => setState(() => _currentIndex = index),
+                      backgroundColor: Colors.black,
+                      selectedItemColor: VohkColors.accent,
+                      unselectedItemColor: const Color(0xFF7A7A7E),
+                      type: BottomNavigationBarType.fixed,
+                      elevation: 0,
+                      selectedFontSize: 10,
+                      unselectedFontSize: 10,
+                      iconSize: 23,
+                      items: navigationItems,
+                    ),
+                  ),
+                ),
+        );
+      },
     );
   }
 }

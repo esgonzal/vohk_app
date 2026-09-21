@@ -3,6 +3,7 @@ import '../services/vohk_api.dart';
 import '../widgets/camera_card.dart';
 import '../vohk_theme.dart';
 import 'live_camera_screen.dart';
+import '../widgets/responsive_content.dart';
 
 class CamerasScreen extends StatefulWidget {
   final Map<String, dynamic>? currentUnit;
@@ -54,69 +55,75 @@ class _CamerasScreenState extends State<CamerasScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tablet = isTabletWidth(context);
     return Scaffold(
       backgroundColor: VohkColors.background,
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: VohkColors.accent))
-          : RefreshIndicator(
-              color: VohkColors.accent,
-              backgroundColor: VohkColors.surface,
-              onRefresh: _refresh,
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(24, 18, 24, 12),
-                    sliver: SliverToBoxAdapter(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'CÁMARAS',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
-                          ),
-                          Row(
-                            children: [
-                              const CircleAvatar(radius: 3.5, backgroundColor: VohkColors.online),
-                              const SizedBox(width: 6),
-                              Text(
-                                '${_cameras.length} en línea',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: VohkColors.textSecondary),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (_cameras.isEmpty)
-                    const SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: Center(
-                        child: Text('No hay cámaras disponibles.', style: TextStyle(color: VohkColors.textSecondary)),
-                      ),
-                    )
-                  else
+          : ResponsiveContent(
+              maxWidth: 1200,
+              child: RefreshIndicator(
+                color: VohkColors.accent,
+                backgroundColor: VohkColors.surface,
+                onRefresh: _refresh,
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 110),
-                      sliver: SliverGrid(
-                        delegate: SliverChildBuilderDelegate((context, index) {
-                          final cam = _cameras[index];
-                          return CameraCard(
-                            title: cam['name'] ?? 'Camera',
-                            snapshotUrl: cam['snapshot_url'] ?? '',
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => LiveCameraScreen(title: cam['name'] ?? 'Live Camera', url: cam['stream_url']),
-                              ),
+                      padding: const EdgeInsets.fromLTRB(24, 18, 24, 12),
+                      sliver: SliverToBoxAdapter(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'CÁMARAS',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
                             ),
-                          );
-                        }, childCount: _cameras.length),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 14, mainAxisSpacing: 14, childAspectRatio: 1),
+                            Row(
+                              children: [
+                                const CircleAvatar(radius: 3.5, backgroundColor: VohkColors.online),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '${_cameras.length} en línea',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: VohkColors.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                ],
+                    if (_cameras.isEmpty)
+                      const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(
+                          child: Text('No hay cámaras disponibles.', style: TextStyle(color: VohkColors.textSecondary)),
+                        ),
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 110),
+                        sliver: SliverGrid(
+                          delegate: SliverChildBuilderDelegate((context, index) {
+                            final cam = _cameras[index];
+                            return CameraCard(
+                              title: cam['name'] ?? 'Camera',
+                              snapshotUrl: cam['snapshot_url'] ?? '',
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => LiveCameraScreen(title: cam['name'] ?? 'Live Camera', url: cam['stream_url']),
+                                ),
+                              ),
+                            );
+                          }, childCount: _cameras.length),
+                          gridDelegate: tablet
+                              ? const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 360, crossAxisSpacing: 14, mainAxisSpacing: 14, childAspectRatio: 1)
+                              : const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 14, mainAxisSpacing: 14, childAspectRatio: 1),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
     );

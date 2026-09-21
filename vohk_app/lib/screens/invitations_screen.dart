@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:vohk_app/widgets/responsive_content.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:vohk_app/services/auth_service.dart';
@@ -514,89 +515,92 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
 
     return Scaffold(
       backgroundColor: VohkColors.background,
-      body: RefreshIndicator(
-        color: VohkColors.accent,
-        backgroundColor: VohkColors.surface,
-        onRefresh: _loadData,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(24, 18, 24, 110),
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'INVITACIONES',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
-                ),
-                ElevatedButton.icon(
-                  onPressed: _loading || !hasUnit || _creating ? null : _showCreateDialog,
-                  icon: _creating ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.add, size: 18),
-                  label: const Text('Nueva'),
+      body: ResponsiveContent(
+        maxWidth: 900,
+        child: RefreshIndicator(
+          color: VohkColors.accent,
+          backgroundColor: VohkColors.surface,
+          onRefresh: _loadData,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(24, 18, 24, 110),
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'INVITACIONES',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: _loading || !hasUnit || _creating ? null : _showCreateDialog,
+                    icon: _creating ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.add, size: 18),
+                    label: const Text('Nueva'),
+                  ),
+                ],
+              ),
+
+              if (!_isResident) ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<Map<String, dynamic>>(
+                  value: _selectedUnit,
+                  decoration: const InputDecoration(labelText: 'Unidad'),
+                  items: _units.map((unit) => DropdownMenuItem(value: unit, child: Text('${unit['building_name']} · ${unit['name']}'))).toList(),
+                  onChanged: _selectUnit,
                 ),
               ],
-            ),
 
-            if (!_isResident) ...[
-              const SizedBox(height: 12),
-              DropdownButtonFormField<Map<String, dynamic>>(
-                value: _selectedUnit,
-                decoration: const InputDecoration(labelText: 'Unidad'),
-                items: _units.map((unit) => DropdownMenuItem(value: unit, child: Text('${unit['building_name']} · ${unit['name']}'))).toList(),
-                onChanged: _selectUnit,
-              ),
+              const SizedBox(height: 14),
+
+              if (!hasUnit)
+                const _InvitationsEmpty('No hay unidades disponibles.')
+              else if (_loading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 120),
+                  child: Center(child: CircularProgressIndicator(color: VohkColors.accent)),
+                )
+              else if (_invitations.isEmpty)
+                const _InvitationsEmpty('No hay invitaciones activas para esta unidad.')
+              else
+                ..._invitations.map((invitation) {
+                  final code = invitation['dynamic_code']?.toString() ?? '';
+
+                  final name = invitation['visitor_name']?.toString() ?? 'Pase Express';
+
+                  return Material(
+                    color: Colors.transparent,
+                    shape: const Border(bottom: BorderSide(color: VohkColors.border)),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.green.withValues(alpha: .15),
+                        child: Icon(invitation['has_face'] == true ? Icons.face : Icons.pin_outlined, color: Colors.green),
+                      ),
+                      title: Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(_typeLabel(invitation['type']?.toString() ?? '')),
+                          Text(
+                            '${_formatStoredDate(invitation['valid_from'])} → '
+                            '${_formatStoredDate(invitation['valid_until'])}',
+                            style: const TextStyle(fontSize: 11, color: VohkColors.textSecondary),
+                          ),
+                          Text('PIN $code', style: const TextStyle(fontSize: 11, color: Colors.green)),
+                        ],
+                      ),
+                      onTap: code.isEmpty ? null : () => _showCodeDialog(code),
+                      trailing: _canDelete(invitation)
+                          ? IconButton(
+                              icon: const Icon(Icons.delete_outline, color: VohkColors.error),
+                              onPressed: () => _confirmDelete(invitation),
+                            )
+                          : null,
+                    ),
+                  );
+                }),
             ],
-
-            const SizedBox(height: 14),
-
-            if (!hasUnit)
-              const _InvitationsEmpty('No hay unidades disponibles.')
-            else if (_loading)
-              const Padding(
-                padding: EdgeInsets.only(top: 120),
-                child: Center(child: CircularProgressIndicator(color: VohkColors.accent)),
-              )
-            else if (_invitations.isEmpty)
-              const _InvitationsEmpty('No hay invitaciones activas para esta unidad.')
-            else
-              ..._invitations.map((invitation) {
-                final code = invitation['dynamic_code']?.toString() ?? '';
-
-                final name = invitation['visitor_name']?.toString() ?? 'Pase Express';
-
-                return Material(
-                  color: Colors.transparent,
-                  shape: const Border(bottom: BorderSide(color: VohkColors.border)),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.green.withValues(alpha: .15),
-                      child: Icon(invitation['has_face'] == true ? Icons.face : Icons.pin_outlined, color: Colors.green),
-                    ),
-                    title: Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(_typeLabel(invitation['type']?.toString() ?? '')),
-                        Text(
-                          '${_formatStoredDate(invitation['valid_from'])} → '
-                          '${_formatStoredDate(invitation['valid_until'])}',
-                          style: const TextStyle(fontSize: 11, color: VohkColors.textSecondary),
-                        ),
-                        Text('PIN $code', style: const TextStyle(fontSize: 11, color: Colors.green)),
-                      ],
-                    ),
-                    onTap: code.isEmpty ? null : () => _showCodeDialog(code),
-                    trailing: _canDelete(invitation)
-                        ? IconButton(
-                            icon: const Icon(Icons.delete_outline, color: VohkColors.error),
-                            onPressed: () => _confirmDelete(invitation),
-                          )
-                        : null,
-                  ),
-                );
-              }),
-          ],
+          ),
         ),
       ),
     );

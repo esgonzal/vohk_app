@@ -123,69 +123,74 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 36),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 24),
-                Center(child: Image.asset('assets/images/vohk-wordmark.png', width: 190, fit: BoxFit.contain)),
-                const Text(
-                  'Portería inteligente',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 15, color: VohkColors.textSecondary),
-                ),
-                const SizedBox(height: 52),
-                const _FieldLabel('USUARIO'),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _usernameController,
-                  style: const TextStyle(color: VohkColors.textPrimary),
-                  decoration: const InputDecoration(
-                    hintText: 'tu.usuario',
-                    prefixIcon: Icon(Icons.person_outline, color: VohkColors.textSecondary),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width >= 600 ? 520 : double.infinity),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 36),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 24),
+                  Center(child: Image.asset('assets/images/vohk-wordmark.png', width: 190, fit: BoxFit.contain)),
+                  const Text(
+                    'Portería inteligente',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 15, color: VohkColors.textSecondary),
                   ),
-                ),
-                const SizedBox(height: 20),
-                const _FieldLabel('CONTRASEÑA'),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  style: const TextStyle(color: VohkColors.textPrimary),
-                  decoration: const InputDecoration(
-                    hintText: '••••••••',
-                    prefixIcon: Icon(Icons.lock_outline, color: VohkColors.textSecondary),
+                  const SizedBox(height: 52),
+                  const _FieldLabel('USUARIO'),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _usernameController,
+                    style: const TextStyle(color: VohkColors.textPrimary),
+                    decoration: const InputDecoration(
+                      hintText: 'tu.usuario',
+                      prefixIcon: Icon(Icons.person_outline, color: VohkColors.textSecondary),
+                    ),
                   ),
-                  onSubmitted: (_) => _login(),
-                ),
-                if (_error != null) ...[
+                  const SizedBox(height: 20),
+                  const _FieldLabel('CONTRASEÑA'),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _passwordController,
+                    obscureText: true,
+                    style: const TextStyle(color: VohkColors.textPrimary),
+                    decoration: const InputDecoration(
+                      hintText: '••••••••',
+                      prefixIcon: Icon(Icons.lock_outline, color: VohkColors.textSecondary),
+                    ),
+                    onSubmitted: (_) => _login(),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.error_outline, color: VohkColors.error, size: 16),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(_error!, style: const TextStyle(color: VohkColors.error, fontSize: 13)),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _loading ? null : _login,
+                      child: _loading
+                          ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black))
+                          : const Text('Ingresar'),
+                    ),
+                  ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      const Icon(Icons.error_outline, color: VohkColors.error, size: 16),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(_error!, style: const TextStyle(color: VohkColors.error, fontSize: 13)),
-                      ),
-                    ],
+                  TextButton(
+                    onPressed: _loading ? null : _showForgotPasswordDialog,
+                    child: const Text('¿Olvidaste tu contraseña?', style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
+                  const SizedBox(height: 24),
                 ],
-                const SizedBox(height: 32),
-                SizedBox(
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: _loading ? null : _login,
-                    child: _loading ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black)) : const Text('Ingresar'),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: _loading ? null : _showForgotPasswordDialog,
-                  child: const Text('¿Olvidaste tu contraseña?', style: TextStyle(fontWeight: FontWeight.w700)),
-                ),
-                const SizedBox(height: 24),
-              ],
+              ),
             ),
           ),
         ),

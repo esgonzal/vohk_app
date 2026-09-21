@@ -3,6 +3,7 @@ import 'package:vohk_app/services/auth_service.dart';
 import 'package:vohk_app/services/vohk_api.dart';
 import 'package:vohk_app/vohk_theme.dart';
 import 'package:vohk_app/screens/outgoing_call_screen.dart';
+import 'package:vohk_app/widgets/responsive_content.dart';
 
 class AdminDirectoryScreen extends StatefulWidget {
   final Map<String, dynamic>? currentCondominium;
@@ -192,59 +193,62 @@ class _AdminDirectoryScreenState extends State<AdminDirectoryScreen> {
     final units = _filteredUnits;
     return Scaffold(
       backgroundColor: VohkColors.background,
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        color: VohkColors.accent,
-        backgroundColor: VohkColors.surface,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 100),
-          children: [
-            SizedBox(
-              height: 42,
-              child: TextField(
-                controller: _searchController,
-                onChanged: (value) => setState(() => _searchQuery = value),
-                style: const TextStyle(color: VohkColors.textPrimary, fontSize: 13),
-                decoration: InputDecoration(
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                  hintText: 'Buscar unidad o residente',
-                  prefixIcon: const Icon(Icons.search, color: VohkColors.textSecondary, size: 19),
-                  suffixIcon: _searchQuery.isEmpty
-                      ? null
-                      : IconButton(
-                          tooltip: 'Limpiar búsqueda',
-                          padding: EdgeInsets.zero,
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                          icon: const Icon(Icons.close, color: VohkColors.textSecondary, size: 18),
-                        ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.only(top: 120),
-                child: Center(child: CircularProgressIndicator(color: VohkColors.accent)),
-              )
-            else if (units.isEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 120),
-                child: Center(
-                  child: Text(
-                    _searchQuery.trim().isEmpty ? 'No hay residentes en este condominio.' : 'No se encontraron unidades o residentes.',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: VohkColors.textSecondary),
+      body: ResponsiveContent(
+        maxWidth: 900,
+        child: RefreshIndicator(
+          onRefresh: _refresh,
+          color: VohkColors.accent,
+          backgroundColor: VohkColors.surface,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 100),
+            children: [
+              SizedBox(
+                height: 42,
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) => setState(() => _searchQuery = value),
+                  style: const TextStyle(color: VohkColors.textPrimary, fontSize: 13),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    hintText: 'Buscar unidad o residente',
+                    prefixIcon: const Icon(Icons.search, color: VohkColors.textSecondary, size: 19),
+                    suffixIcon: _searchQuery.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Limpiar búsqueda',
+                            padding: EdgeInsets.zero,
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                            icon: const Icon(Icons.close, color: VohkColors.textSecondary, size: 18),
+                          ),
                   ),
                 ),
-              )
-            else
-              ...units.map(_unitCard),
-          ],
+              ),
+              const SizedBox(height: 8),
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 120),
+                  child: Center(child: CircularProgressIndicator(color: VohkColors.accent)),
+                )
+              else if (units.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 120),
+                  child: Center(
+                    child: Text(
+                      _searchQuery.trim().isEmpty ? 'No hay residentes en este condominio.' : 'No se encontraron unidades o residentes.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: VohkColors.textSecondary),
+                    ),
+                  ),
+                )
+              else
+                ...units.map(_unitCard),
+            ],
+          ),
         ),
       ),
     );

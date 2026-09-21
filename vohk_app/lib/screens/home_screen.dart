@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vohk_app/services/auth_service.dart';
 import 'package:flutter/material.dart';
+import 'package:vohk_app/widgets/responsive_content.dart';
 import 'package:vohk_app/services/vohk_api.dart';
 import 'package:vohk_app/screens/intercom_detail_screen.dart';
 import '../vohk_theme.dart';
@@ -293,65 +294,68 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: VohkColors.background,
-      body: RefreshIndicator(
-        color: VohkColors.accent,
-        backgroundColor: VohkColors.surface,
-        onRefresh: _refresh,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(24, 18, 24, 110),
-          children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'ACCESOS FAVORITOS',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
+      body: ResponsiveContent(
+        maxWidth: 960,
+        child: RefreshIndicator(
+          color: VohkColors.accent,
+          backgroundColor: VohkColors.surface,
+          onRefresh: _refresh,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(24, 18, 24, 110),
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'ACCESOS FAVORITOS',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
+                    ),
                   ),
-                ),
-                TextButton(
-                  onPressed: _editingFavorites ? _saveFavoritePreferences : _startEditingFavorites,
-                  style: TextButton.styleFrom(
-                    foregroundColor: VohkColors.accent,
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(45, 30),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  TextButton(
+                    onPressed: _editingFavorites ? _saveFavoritePreferences : _startEditingFavorites,
+                    style: TextButton.styleFrom(
+                      foregroundColor: VohkColors.accent,
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(45, 30),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(_editingFavorites ? 'Listo' : 'Editar', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                   ),
-                  child: Text(_editingFavorites ? 'Listo' : 'Editar', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _buildAccessCard(),
-            const SizedBox(height: 28),
-            InkWell(
-              onTap: () {
-                setState(() {
-                  _activityExpanded = !_activityExpanded;
-                });
-              },
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'ACTIVIDAD RECIENTE',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _buildAccessCard(),
+              const SizedBox(height: 28),
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _activityExpanded = !_activityExpanded;
+                  });
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'ACTIVIDAD RECIENTE',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
+                        ),
                       ),
-                    ),
-                    AnimatedRotation(
-                      turns: _activityExpanded ? 0.25 : 0,
-                      duration: const Duration(milliseconds: 180),
-                      child: const Icon(Icons.chevron_right_rounded, size: 18, color: VohkColors.textSecondary),
-                    ),
-                  ],
+                      AnimatedRotation(
+                        turns: _activityExpanded ? 0.25 : 0,
+                        duration: const Duration(milliseconds: 180),
+                        child: const Icon(Icons.chevron_right_rounded, size: 18, color: VohkColors.textSecondary),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            if (_activityExpanded) ...[const SizedBox(height: 12), _buildActivityCard()],
-          ],
+              if (_activityExpanded) ...[const SizedBox(height: 12), _buildActivityCard()],
+            ],
+          ),
         ),
       ),
     );

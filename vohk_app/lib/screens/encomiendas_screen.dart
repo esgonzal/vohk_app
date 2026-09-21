@@ -8,6 +8,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:vohk_app/services/auth_service.dart';
 import 'package:vohk_app/services/vohk_api.dart';
 import 'package:vohk_app/vohk_theme.dart';
+import 'package:vohk_app/widgets/responsive_content.dart';
 
 class EncomiendasScreen extends StatefulWidget {
   final Map<String, dynamic>? currentLocation;
@@ -282,10 +283,17 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
       useSafeArea: true,
       showDragHandle: true,
       backgroundColor: VohkColors.surface,
-      builder: (sheetContext) => SizedBox(
-        height: MediaQuery.sizeOf(sheetContext).height * .86,
-        child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 28), child: _packageDetails(current, sheetContext)),
-      ),
+      builder: (sheetContext) {
+        final details = SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * .86,
+          child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 28), child: _packageDetails(current, sheetContext)),
+        );
+        if (!isTabletWidth(sheetContext)) return details;
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 680), child: details),
+        );
+      },
     );
   }
 
@@ -323,31 +331,50 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
     final visibleEncomiendas = _visibleEncomiendas;
     return Scaffold(
       backgroundColor: VohkColors.background,
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        color: VohkColors.accent,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
-          children: [
-            if (!_isResident) _staffControls(),
-            if (_isResident)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 14),
-                child: Text('Tus encomiendas pendientes', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
-              ),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.only(top: 100),
-                child: Center(child: CircularProgressIndicator(color: VohkColors.accent)),
-              )
-            else if (visibleEncomiendas.isEmpty)
-              _emptyState(filtered: _encomiendas.isNotEmpty && _searchQuery.trim().isNotEmpty)
-            else
-              ...visibleEncomiendas.map(_packageCard),
-          ],
+      body: ResponsiveContent(
+        maxWidth: 1000,
+        child: RefreshIndicator(
+          onRefresh: _refresh,
+          color: VohkColors.accent,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
+            children: [
+              if (!_isResident) _staffControls(),
+              if (_isResident)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 14),
+                  child: Text('Tus encomiendas pendientes', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+                ),
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 100),
+                  child: Center(child: CircularProgressIndicator(color: VohkColors.accent)),
+                )
+              else if (visibleEncomiendas.isEmpty)
+                _emptyState(filtered: _encomiendas.isNotEmpty && _searchQuery.trim().isNotEmpty)
+              else
+                _packageCollection(visibleEncomiendas),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _packageCollection(List<Map<String, dynamic>> items) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 900) {
+          return Column(children: items.map(_packageCard).toList());
+        }
+        const spacing = 10.0;
+        final cardWidth = (constraints.maxWidth - spacing) / 2;
+        return Wrap(
+          spacing: spacing,
+          children: items.map((item) => SizedBox(width: cardWidth, child: _packageCard(item))).toList(),
+        );
+      },
     );
   }
 
