@@ -1,7 +1,7 @@
 name: vohk_app
-description: "One mobile access, intercom, camera, and community management."
-publish_to: 'none' 
-version: 1.0.1+3
+description: "Vöhk Comunidades - Mobile access, intercom, camera, and community management."
+publish_to: 'none'
+version: 1.0.2+1
 
 environment:
   sdk: ^3.8.1
