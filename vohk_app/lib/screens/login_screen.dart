@@ -5,6 +5,7 @@ import 'package:vohk_app/services/auth_service.dart';
 import 'package:vohk_app/services/notification_service.dart';
 import 'package:vohk_app/services/twilio_service.dart';
 import '../vohk_theme.dart';
+import '../widgets/one_brand.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -120,76 +121,82 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width >= 600 ? 520 : double.infinity),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 36),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 24),
-                  Center(child: Image.asset('assets/images/vohk-wordmark.png', width: 190, fit: BoxFit.contain)),
-                  const Text(
-                    'Portería inteligente',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 15, color: VohkColors.textSecondary),
-                  ),
-                  const SizedBox(height: 52),
-                  const _FieldLabel('USUARIO'),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _usernameController,
-                    style: const TextStyle(color: VohkColors.textPrimary),
-                    decoration: const InputDecoration(
-                      hintText: 'tu.usuario',
-                      prefixIcon: Icon(Icons.person_outline, color: VohkColors.textSecondary),
+      backgroundColor: VohkColors.background,
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(center: Alignment(-.9, -1.05), radius: 1.15, colors: [Color(0x332E6BFF), VohkColors.background]),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width >= 600 ? 520 : double.infinity),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 36),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 24),
+                    const Center(child: OneWordmark(height: 62)),
+                    const SizedBox(height: 22),
+                    const Text(
+                      'Todo tu edificio. Una sola app.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 15, color: VohkColors.textSecondary),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  const _FieldLabel('CONTRASEÑA'),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _passwordController,
-                    obscureText: true,
-                    style: const TextStyle(color: VohkColors.textPrimary),
-                    decoration: const InputDecoration(
-                      hintText: '••••••••',
-                      prefixIcon: Icon(Icons.lock_outline, color: VohkColors.textSecondary),
+                    const SizedBox(height: 52),
+                    const _FieldLabel('USUARIO'),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _usernameController,
+                      style: const TextStyle(color: VohkColors.textPrimary),
+                      decoration: const InputDecoration(
+                        hintText: 'tu.usuario',
+                        prefixIcon: Icon(Icons.person_outline, color: VohkColors.textSecondary),
+                      ),
                     ),
-                    onSubmitted: (_) => _login(),
-                  ),
-                  if (_error != null) ...[
+                    const SizedBox(height: 20),
+                    const _FieldLabel('CONTRASEÑA'),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      style: const TextStyle(color: VohkColors.textPrimary),
+                      decoration: const InputDecoration(
+                        hintText: '••••••••',
+                        prefixIcon: Icon(Icons.lock_outline, color: VohkColors.textSecondary),
+                      ),
+                      onSubmitted: (_) => _login(),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: VohkColors.error, size: 16),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(_error!, style: const TextStyle(color: VohkColors.error, fontSize: 13)),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: _loading ? null : _login,
+                        child: _loading
+                            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                            : const Text('Ingresar'),
+                      ),
+                    ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Icon(Icons.error_outline, color: VohkColors.error, size: 16),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(_error!, style: const TextStyle(color: VohkColors.error, fontSize: 13)),
-                        ),
-                      ],
+                    TextButton(
+                      onPressed: _loading ? null : _showForgotPasswordDialog,
+                      child: const Text('¿Olvidaste tu contraseña?', style: TextStyle(fontWeight: FontWeight.w700)),
                     ),
+                    const SizedBox(height: 24),
                   ],
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: _loading ? null : _login,
-                      child: _loading
-                          ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black))
-                          : const Text('Ingresar'),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: _loading ? null : _showForgotPasswordDialog,
-                    child: const Text('¿Olvidaste tu contraseña?', style: TextStyle(fontWeight: FontWeight.w700)),
-                  ),
-                  const SizedBox(height: 24),
-                ],
+                ),
               ),
             ),
           ),

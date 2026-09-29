@@ -195,7 +195,7 @@ class _ActionButton extends StatelessWidget {
             child: loading
                 ? const Padding(
                     padding: EdgeInsets.all(16),
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   )
                 : Icon(icon, color: accent ? Colors.black : Colors.white),
           ),

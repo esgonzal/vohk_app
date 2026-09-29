@@ -3,20 +3,22 @@ import 'package:flutter/material.dart';
 class VohkColors {
   VohkColors._();
 
-  static const background = Color(0xFF000000);
-  static const surface = Color(0xFF161618);
-  static const surfaceAlt = Color(0xFF1C1C1E);
-  static const border = Color(0xFF2A2A2D);
-  static const accent = Color(0xFFF9C110);
-  static const accentDim = Color(0xFF332A08);
+  static const background = Color(0xFF080A09);
+  static const surface = Color(0xFF101413);
+  static const surfaceAlt = Color(0xFF151A18);
+  static const border = Color(0xFF262C29);
+  static const accent = Color(0xFF2E6BFF);
+  static const accentLight = Color(0xFF648FFF);
+  static const accentDim = Color(0xFF14244D);
+  static const connector = Color(0xFFFFCC00);
   static const callGreen = Color(0xFF34C759);
   static const online = Color(0xFF34C759);
-  static const restricted = Color(0xFFF9C110);
+  static const restricted = Color(0xFFFFCC00);
   static const offline = Color(0xFF6B6B70);
   static const error = Color(0xFFFF4D4D);
-  static const textPrimary = Color(0xFFFFFFFF);
-  static const textSecondary = Color(0xFF8B8B90);
-  static const textMuted = Color(0xFF5E5E63);
+  static const textPrimary = Color(0xFFF3F1EB);
+  static const textSecondary = Color(0xFF969D99);
+  static const textMuted = Color(0xFF626A66);
 }
 
 ThemeData vohkTheme() {
@@ -44,7 +46,7 @@ ThemeData vohkTheme() {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: VohkColors.accent,
-        foregroundColor: Colors.black,
+        foregroundColor: Colors.white,
         disabledBackgroundColor: VohkColors.accentDim,
         disabledForegroundColor: VohkColors.textSecondary,
         minimumSize: const Size.fromHeight(48),

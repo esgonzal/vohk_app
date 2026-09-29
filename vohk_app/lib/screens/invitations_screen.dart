@@ -320,6 +320,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
             actions: [
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
               ElevatedButton(
+                style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48)),
                 onPressed: () {
                   String? validationError;
                   if (!_isResident && residentUserId == null) {
@@ -533,6 +534,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
                   ),
                   ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48)),
                     onPressed: _loading || !hasUnit || _creating ? null : _showCreateDialog,
                     icon: _creating ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.add, size: 18),
                     label: const Text('Nueva'),

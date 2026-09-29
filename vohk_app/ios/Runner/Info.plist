@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Vöhk Comunidades</string>
+	<string>One</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Vöhk Comunidades</string>
+	<string>One</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -27,9 +27,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Vöhk Comunidades usa la cámara para registrar encomiendas, escanear códigos QR y administrar el reconocimiento facial.</string>
+	<string>One usa la cámara para registrar encomiendas, escanear códigos QR y administrar el reconocimiento facial.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Vöhk Comunidades usa el micrófono para hablar durante las llamadas de citofonía.</string>
+	<string>One usa el micrófono para hablar durante las llamadas de citofonía.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

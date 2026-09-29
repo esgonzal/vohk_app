@@ -7,6 +7,7 @@ import 'package:vohk_app/services/auth_service.dart';
 import 'package:vohk_app/services/notification_service.dart';
 import 'package:vohk_app/services/twilio_service.dart';
 import 'package:vohk_app/services/incoming_call_service.dart';
+import 'package:vohk_app/vohk_theme.dart';
 import 'screens/login_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -95,9 +96,9 @@ class VohkApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: 'Vöhk Comunidades',
+      title: 'One',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
+      theme: vohkTheme(),
       home: hasSession ? const MainShell() : const LoginScreen(),
     );
   }

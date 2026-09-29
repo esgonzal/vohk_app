@@ -249,7 +249,7 @@ class _TtlockAccessCard extends StatelessWidget {
             child: ElevatedButton(
               onPressed: hasRemoteAccess && !opening ? onOpen : null,
               style: ElevatedButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(82, 42)),
-              child: opening ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black)) : const Text('Abrir'),
+              child: opening ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Abrir'),
             ),
           ),
         ],

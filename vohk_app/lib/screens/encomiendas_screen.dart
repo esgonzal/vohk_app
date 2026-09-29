@@ -342,10 +342,11 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
             children: [
               if (!_isResident) _staffControls(),
               if (_isResident)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 14),
-                  child: Text('Tus encomiendas pendientes', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Text(_includeHistory ? 'Tus encomiendas' : 'Tus encomiendas pendientes', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
                 ),
+              _historyToggle(),
               if (_loading)
                 const Padding(
                   padding: EdgeInsets.only(top: 100),
@@ -412,18 +413,23 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
           textInputAction: TextInputAction.search,
           onChanged: (value) => setState(() => _searchQuery = value),
         ),
-        SwitchListTile.adaptive(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Mostrar historial', style: TextStyle(fontSize: 14)),
-          value: _includeHistory,
-          activeThumbColor: VohkColors.accent,
-          onChanged: (value) {
-            setState(() => _includeHistory = value);
-            _loadData();
-          },
-        ),
-        const SizedBox(height: 4),
       ],
+    );
+  }
+
+  Widget _historyToggle() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: SwitchListTile.adaptive(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Mostrar historial', style: TextStyle(fontSize: 14)),
+        value: _includeHistory,
+        activeThumbColor: VohkColors.accent,
+        onChanged: (value) {
+          setState(() => _includeHistory = value);
+          _loadData();
+        },
+      ),
     );
   }
 
@@ -438,7 +444,7 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
             filtered
                 ? 'No hay encomiendas que coincidan con la búsqueda.'
                 : _isResident
-                ? 'No tienes encomiendas pendientes.'
+                ? (_includeHistory ? 'No tienes encomiendas registradas.' : 'No tienes encomiendas pendientes.')
                 : (_includeHistory ? 'No hay encomiendas registradas.' : 'No hay encomiendas pendientes.'),
             style: const TextStyle(color: VohkColors.textSecondary),
             textAlign: TextAlign.center,
