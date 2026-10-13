@@ -27,6 +27,7 @@ class NotificationService {
   }
 
   static Future<String> requestPermissionAndGetToken() async {
+    await FirebaseMessaging.instance.setAutoInitEnabled(true);
     final settings = await FirebaseMessaging.instance.requestPermission(alert: true, badge: true, sound: true, provisional: false);
     if (settings.authorizationStatus == AuthorizationStatus.denied) {
       throw Exception('Notification permission was denied.');
@@ -41,7 +42,9 @@ class NotificationService {
   static Future<String> _getRequiredToken() async {
     if (Platform.isIOS) {
       String? apnsToken;
-      for (var attempt = 0; attempt < 20; attempt++) {
+      // APNs registration may finish a few seconds after Firebase starts,
+      // especially on the first launch after installing from TestFlight.
+      for (var attempt = 0; attempt < 40; attempt++) {
         apnsToken = await FirebaseMessaging.instance.getAPNSToken();
         if (apnsToken != null && apnsToken.isNotEmpty) {
           break;

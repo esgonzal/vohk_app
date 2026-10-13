@@ -15,6 +15,7 @@ class _LiveCameraViewState extends State<LiveCameraView> {
   final RTCVideoRenderer _renderer = RTCVideoRenderer();
   RTCPeerConnection? _pc;
   bool loadingVideo = true;
+  bool _disposed = false;
 
   @override
   void initState() {
@@ -25,6 +26,7 @@ class _LiveCameraViewState extends State<LiveCameraView> {
   Future<void> _startWebRTC() async {
     try {
       await _renderer.initialize();
+      if (_disposed) return;
       final config = {
         'iceServers': [
           {
@@ -32,30 +34,37 @@ class _LiveCameraViewState extends State<LiveCameraView> {
           },
         ],
       };
-      _pc = await createPeerConnection(config);
-      await _pc!.addTransceiver(
+      final peerConnection = await createPeerConnection(config);
+      if (_disposed) {
+        await peerConnection.close();
+        return;
+      }
+      _pc = peerConnection;
+      await peerConnection.addTransceiver(
         kind: RTCRtpMediaType.RTCRtpMediaTypeVideo,
         init: RTCRtpTransceiverInit(direction: TransceiverDirection.RecvOnly),
       );
-      _pc!.onTrack = (event) {
+      peerConnection.onTrack = (event) {
         if (event.streams.isNotEmpty) {
           final stream = event.streams[0];
           for (final audioTrack in stream.getAudioTracks()) {
             audioTrack.enabled = false;
             audioTrack.stop();
           }
-          _renderer.srcObject = stream;
-          if (mounted) {
+          if (!_disposed) _renderer.srcObject = stream;
+          if (mounted && !_disposed) {
             setState(() {
               loadingVideo = false;
             });
           }
         }
       };
-      final offer = await _pc!.createOffer();
-      await _pc!.setLocalDescription(offer);
+      final offer = await peerConnection.createOffer();
+      if (_disposed) return;
+      await peerConnection.setLocalDescription(offer);
       await Future.delayed(const Duration(milliseconds: 500));
-      final localDesc = await _pc!.getLocalDescription();
+      if (_disposed) return;
+      final localDesc = await peerConnection.getLocalDescription();
       final whepUrl = '${widget.streamUrl}whep';
       final request = await HttpClient().postUrl(Uri.parse(whepUrl));
       request.headers.set('Content-Type', 'application/sdp');
@@ -65,7 +74,8 @@ class _LiveCameraViewState extends State<LiveCameraView> {
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception('WHEP failed: ${response.statusCode} $body');
       }
-      await _pc!.setRemoteDescription(RTCSessionDescription(body, 'answer'));
+      if (_disposed) return;
+      await peerConnection.setRemoteDescription(RTCSessionDescription(body, 'answer'));
     } catch (e) {
       debugPrint('WEBRTC ERROR: $e');
     }
@@ -73,6 +83,7 @@ class _LiveCameraViewState extends State<LiveCameraView> {
 
   @override
   void dispose() {
+    _disposed = true;
     final stream = _renderer.srcObject;
     if (stream != null) {
       for (final track in stream.getTracks()) {

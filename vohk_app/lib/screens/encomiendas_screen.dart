@@ -459,6 +459,7 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
     final created = DateTime.tryParse(item['created_at']?.toString() ?? '')?.toLocal();
     final recipient = _value(item, 'recipient_name');
     final building = _value(item, 'building_name');
+    final unit = _value(item, 'unit_name') ?? _value(item, 'room_no') ?? 'Unidad';
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -485,14 +486,14 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        item['unit_name']?.toString() ?? 'Unidad',
+                        recipient ?? unit,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, height: 1.1),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        [if (building != null) building, recipient == null ? _formatDate(created) : 'Para $recipient'].join(' · '),
+                        [if (building != null) building, if (recipient != null) unit, _formatDate(created)].join(' · '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(color: VohkColors.textSecondary, fontSize: 12),

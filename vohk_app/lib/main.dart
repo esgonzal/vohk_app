@@ -36,6 +36,7 @@ Future<void> main() async {
         } catch (error, stackTrace) {
           debugPrint('${Platform.isIOS ? 'iOS' : 'Android'} notification setup failed: $error');
           debugPrintStack(stackTrace: stackTrace);
+          await AuthService.reportFcmRegistrationFailure(error);
           if (Platform.isAndroid) rethrow;
         }
       }

@@ -147,6 +147,27 @@ class AuthService {
     }
   }
 
+  static Future<void> reportFcmRegistrationFailure(Object error) async {
+    final currentJwt = jwt;
+    if (currentJwt == null || currentJwt.isEmpty) return;
+    try {
+      await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/auth/register-fcm/failure'),
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $currentJwt'},
+        body: jsonEncode({
+          'platform': Platform.isIOS
+              ? 'ios'
+              : Platform.isAndroid
+              ? 'android'
+              : 'unknown',
+          'error': error.toString(),
+        }),
+      );
+    } catch (_) {
+      // Diagnostics must never prevent login or call registration.
+    }
+  }
+
   static Future<void> forgotPassword(String email) async {
     final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/auth/forgot-password'),

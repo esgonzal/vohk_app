@@ -7,6 +7,7 @@ import 'package:vohk_app/screens/invitations_screen.dart';
 import 'package:vohk_app/screens/encomiendas_screen.dart';
 import 'package:vohk_app/screens/login_screen.dart';
 import 'package:vohk_app/screens/admin_directory_screen.dart';
+import 'package:vohk_app/screens/staff_concierge_screen.dart';
 import 'package:vohk_app/services/auth_service.dart';
 import 'package:vohk_app/services/notification_service.dart';
 import 'package:vohk_app/services/twilio_service.dart';
@@ -27,6 +28,7 @@ class _MainShellState extends State<MainShell> {
   List<Map<String, dynamic>> _locations = [];
   Map<String, dynamic>? _currentLocation;
   bool get _isResident => AuthService.role == 'resident';
+  bool get _isStaff => AuthService.role == 'staff';
 
   bool get _residentCameraAccess {
     if (!_isResident) return true;
@@ -56,7 +58,15 @@ class _MainShellState extends State<MainShell> {
       AdminDirectoryScreen(key: ValueKey('directory-$_currentCondominiumId'), currentCondominium: _currentLocation, onRefreshLocations: _loadLocations),
       InvitationsScreen(key: ValueKey('invitations-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
       EncomiendasScreen(key: ValueKey('encomiendas-$_currentCondominiumId'), currentLocation: _currentLocation, onRefreshLocations: _loadLocations),
-      CamerasScreen(key: ValueKey('cameras-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
+      if (_isStaff)
+        StaffConciergeScreen(
+          key: ValueKey('concierge-$_currentCondominiumId'),
+          currentCondominium: _currentLocation,
+          onRefreshLocations: _loadLocations,
+          isActive: _currentIndex == 4,
+        )
+      else
+        CamerasScreen(key: ValueKey('cameras-$_currentCondominiumId'), currentUnit: _currentLocation, onRefreshUnits: _loadLocations),
     ];
   }
 
@@ -69,12 +79,16 @@ class _MainShellState extends State<MainShell> {
         if (_residentCameraAccess) const BottomNavigationBarItem(icon: Icon(Icons.videocam_outlined), activeIcon: Icon(Icons.videocam), label: 'Cámaras'),
       ];
     }
-    return const [
+    return [
       BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Accesos'),
       BottomNavigationBarItem(icon: Icon(Icons.groups_outlined), activeIcon: Icon(Icons.groups), label: 'Unidades'),
       BottomNavigationBarItem(icon: Icon(Icons.person_add_outlined), activeIcon: Icon(Icons.person_add), label: 'Invitados'),
       BottomNavigationBarItem(icon: Icon(Icons.inventory_2_outlined), activeIcon: Icon(Icons.inventory_2), label: 'Encomiendas'),
-      BottomNavigationBarItem(icon: Icon(Icons.videocam_outlined), activeIcon: Icon(Icons.videocam), label: 'Cámaras'),
+      BottomNavigationBarItem(
+        icon: Icon(_isStaff ? Icons.support_agent_outlined : Icons.videocam_outlined),
+        activeIcon: Icon(_isStaff ? Icons.support_agent : Icons.videocam),
+        label: _isStaff ? 'Conserjería' : 'Cámaras',
+      ),
     ];
   }
 
@@ -836,7 +850,7 @@ class _MainShellState extends State<MainShell> {
     final safeIndex = _currentIndex < tabs.length ? _currentIndex : 0;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final useNavigationRail = constraints.maxWidth >= 900;
+        final useNavigationRail = constraints.maxWidth >= 900 && !_isStaff;
         final tablet = constraints.maxWidth >= 600;
         final content = SafeArea(
           bottom: useNavigationRail,

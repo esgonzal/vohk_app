@@ -9,7 +9,12 @@ import UIKit
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    let launched = super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    // Twilio's PushKit token and Firebase's ordinary APNs token are separate.
+    // Explicitly start ordinary remote-notification registration so Firebase
+    // can map the APNs token to an FCM registration token on every launch.
+    application.registerForRemoteNotifications()
+    return launched
   }
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
