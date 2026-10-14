@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:vohk_app/services/auth_service.dart';
+import 'package:vohk_app/services/notification_service.dart';
 import 'package:vohk_app/services/vohk_api.dart';
 import 'package:vohk_app/vohk_theme.dart';
 import 'package:vohk_app/widgets/responsive_content.dart';
@@ -32,6 +33,9 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
   String _searchQuery = '';
   int _loadGeneration = 0;
   Timer? _claimRefreshTimer;
+  StreamSubscription<EncomiendaDeliveryEvent>? _deliverySubscription;
+  BuildContext? _detailsSheetContext;
+  String? _detailsPackageId;
 
   String? get _condominiumId => widget.currentLocation?['condominium_id']?.toString();
   String? get _unitId {
@@ -46,6 +50,7 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
     _loadData();
     if (_isResident) {
       _claimRefreshTimer = Timer.periodic(const Duration(minutes: 4), (_) => _loadData(silent: true));
+      _deliverySubscription = NotificationService.onEncomiendaDelivered.listen(_handleDeliveryEvent);
     }
   }
 
@@ -62,6 +67,7 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
   @override
   void dispose() {
     _claimRefreshTimer?.cancel();
+    _deliverySubscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -138,6 +144,28 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
 
   String _errorMessage(Object error) => error.toString().replaceFirst('Exception: ', '');
   void _showMessage(String message) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+
+  Future<void> _handleDeliveryEvent(EncomiendaDeliveryEvent event) async {
+    if (!mounted || event.unitId != _unitId) return;
+    setState(() => _encomiendas.removeWhere((item) => item['encomienda_id']?.toString() == event.encomiendaId));
+    if (_detailsPackageId == event.encomiendaId && _detailsSheetContext != null) {
+      Navigator.of(_detailsSheetContext!).pop();
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+    }
+    if (!mounted) return;
+    await showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (_, __, ___) => const _DeliverySuccessOverlay(),
+      transitionBuilder: (_, animation, __, child) => ScaleTransition(
+        scale: CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+        child: FadeTransition(opacity: animation, child: child),
+      ),
+    );
+    if (mounted) await _loadData(silent: true);
+  }
 
   Future<void> _createEncomienda() async {
     if (_units.isEmpty) {
@@ -277,24 +305,31 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
       current = refreshed;
     }
     if (!mounted) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      backgroundColor: VohkColors.surface,
-      builder: (sheetContext) {
-        final details = SizedBox(
-          height: MediaQuery.sizeOf(sheetContext).height * .86,
-          child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 28), child: _packageDetails(current, sheetContext)),
-        );
-        if (!isTabletWidth(sheetContext)) return details;
-        return Align(
-          alignment: Alignment.bottomCenter,
-          child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 680), child: details),
-        );
-      },
-    );
+    _detailsPackageId = current['encomienda_id']?.toString();
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: true,
+        backgroundColor: VohkColors.surface,
+        builder: (sheetContext) {
+          _detailsSheetContext = sheetContext;
+          final details = SizedBox(
+            height: MediaQuery.sizeOf(sheetContext).height * .86,
+            child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 28), child: _packageDetails(current, sheetContext)),
+          );
+          if (!isTabletWidth(sheetContext)) return details;
+          return Align(
+            alignment: Alignment.bottomCenter,
+            child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 680), child: details),
+          );
+        },
+      );
+    } finally {
+      _detailsPackageId = null;
+      _detailsSheetContext = null;
+    }
   }
 
   Future<void> _cancel(Map<String, dynamic> encomienda) async {
@@ -663,6 +698,79 @@ class _EncomiendasScreenState extends State<EncomiendasScreen> {
     if (value == null) return '';
     String two(int number) => number.toString().padLeft(2, '0');
     return '${two(value.day)}/${two(value.month)}/${value.year} ${two(value.hour)}:${two(value.minute)}';
+  }
+}
+
+class _DeliverySuccessOverlay extends StatefulWidget {
+  const _DeliverySuccessOverlay();
+
+  @override
+  State<_DeliverySuccessOverlay> createState() => _DeliverySuccessOverlayState();
+}
+
+class _DeliverySuccessOverlayState extends State<_DeliverySuccessOverlay> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 520));
+    _scale = CurvedAnimation(parent: _controller, curve: Curves.elasticOut);
+    _controller.forward();
+    Future<void>.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) Navigator.of(context).pop();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Center(
+        child: Container(
+          width: 250,
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 30),
+          decoration: BoxDecoration(
+            color: VohkColors.surface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFF2ECC71), width: 1.5),
+            boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 28, offset: Offset(0, 12))],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ScaleTransition(
+                scale: _scale,
+                child: const CircleAvatar(
+                  radius: 39,
+                  backgroundColor: Color(0xFF2ECC71),
+                  child: Icon(Icons.check_rounded, size: 52, color: Colors.white),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                '¡Encomienda entregada!',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 7),
+              const Text(
+                'La entrega fue confirmada.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: VohkColors.textSecondary, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

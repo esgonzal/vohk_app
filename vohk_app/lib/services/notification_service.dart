@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -13,6 +14,8 @@ class NotificationService {
   static bool _initialized = false;
   static final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   static Stream<String> get onTokenRefresh => FirebaseMessaging.instance.onTokenRefresh;
+  static final StreamController<EncomiendaDeliveryEvent> _encomiendaDeliveryController = StreamController<EncomiendaDeliveryEvent>.broadcast();
+  static Stream<EncomiendaDeliveryEvent> get onEncomiendaDelivered => _encomiendaDeliveryController.stream;
 
   static Future<void> initialize() async {
     if (_initialized) return;
@@ -23,6 +26,7 @@ class NotificationService {
       ),
     );
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleOpenedMessage);
     _initialized = true;
   }
 
@@ -84,5 +88,28 @@ class NotificationService {
         payload: message.data['encomiendaId'],
       );
     }
+    if (message.data['type'] == 'encomienda_delivered') {
+      _emitEncomiendaDelivery(message);
+    }
   }
+
+  static void _handleOpenedMessage(RemoteMessage message) {
+    if (message.data['type'] == 'encomienda_delivered') {
+      _emitEncomiendaDelivery(message);
+    }
+  }
+
+  static void _emitEncomiendaDelivery(RemoteMessage message) {
+    final encomiendaId = message.data['encomiendaId']?.toString();
+    final unitId = message.data['unitId']?.toString();
+    if (encomiendaId == null || encomiendaId.isEmpty || unitId == null || unitId.isEmpty) return;
+    _encomiendaDeliveryController.add(EncomiendaDeliveryEvent(encomiendaId: encomiendaId, unitId: unitId));
+  }
+}
+
+class EncomiendaDeliveryEvent {
+  final String encomiendaId;
+  final String unitId;
+
+  const EncomiendaDeliveryEvent({required this.encomiendaId, required this.unitId});
 }

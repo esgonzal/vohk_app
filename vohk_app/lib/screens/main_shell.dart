@@ -8,6 +8,7 @@ import 'package:vohk_app/screens/encomiendas_screen.dart';
 import 'package:vohk_app/screens/login_screen.dart';
 import 'package:vohk_app/screens/admin_directory_screen.dart';
 import 'package:vohk_app/screens/staff_concierge_screen.dart';
+import 'package:vohk_app/screens/outgoing_call_screen.dart';
 import 'package:vohk_app/services/auth_service.dart';
 import 'package:vohk_app/services/notification_service.dart';
 import 'package:vohk_app/services/twilio_service.dart';
@@ -24,6 +25,7 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
   bool _locationsLoaded = false;
+  bool _placingManagementCall = false;
   int _locationLoadGeneration = 0;
   List<Map<String, dynamic>> _locations = [];
   Map<String, dynamic>? _currentLocation;
@@ -184,6 +186,30 @@ class _MainShellState extends State<MainShell> {
     Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
   }
 
+  Future<void> _callManagement() async {
+    if (!_isResident || _placingManagementCall) return;
+    final condominiumId = _currentCondominiumId;
+    final callerIdentity = AuthService.identity;
+    if (condominiumId == null || condominiumId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se encontró el condominio actual.')));
+      return;
+    }
+    if (callerIdentity == null || callerIdentity.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se encontró tu identidad de llamada.')));
+      return;
+    }
+    setState(() => _placingManagementCall = true);
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => OutgoingCallScreen(callerIdentity: callerIdentity, recipientIdentity: 'management:$condominiumId', recipientName: 'Conserjería'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _placingManagementCall = false);
+    }
+  }
+
   Future<void> _changeUsername() async {
     final username = await _showSingleInputDialog(title: 'Cambiar nombre de usuario', label: 'Nuevo nombre de usuario', initialValue: AuthService.username ?? '');
     final value = username?.trim();
@@ -214,8 +240,8 @@ class _MainShellState extends State<MainShell> {
       return;
     }
     try {
-      final updatedEmail = await VohkApi.updateEmail(value);
-      await AuthService.updateCachedEmail(updatedEmail);
+      final updated = await VohkApi.updateEmail(value);
+      await Future.wait([AuthService.updateCachedEmail(updated.email), AuthService.updateCachedUsername(updated.username)]);
       if (!mounted) return;
       setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Correo electrónico actualizado.')));
@@ -708,6 +734,16 @@ class _MainShellState extends State<MainShell> {
                   const Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
+                      'AYUDA',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  _profileTile(Icons.support_agent_outlined, 'Llamar a conserjería', _callManagement),
+                  const SizedBox(height: 8),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
                       'ACCESOS',
                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: VohkColors.textSecondary, letterSpacing: 1.4),
                     ),
@@ -900,6 +936,18 @@ class _MainShellState extends State<MainShell> {
                   ],
                 )
               : content,
+          floatingActionButton: _isResident && _currentLocation != null
+              ? FloatingActionButton(
+                  heroTag: 'resident-management-call',
+                  tooltip: 'Llamar a conserjería',
+                  onPressed: _placingManagementCall ? null : _callManagement,
+                  backgroundColor: const Color.fromARGB(255, 53, 255, 46),
+                  foregroundColor: Colors.black,
+                  child: _placingManagementCall
+                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                      : const Icon(Icons.support_agent),
+                )
+              : null,
           bottomNavigationBar: useNavigationRail
               ? null
               : Container(

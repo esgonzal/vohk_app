@@ -310,7 +310,7 @@ class VohkApi {
     return updatedUsername;
   }
 
-  static Future<String> updateEmail(String email) async {
+  static Future<({String email, String username})> updateEmail(String email) async {
     final response = await http.put(Uri.parse('${ApiConfig.baseUrl}/users/email'), headers: _headers(), body: jsonEncode({'email': email}));
     if (response.statusCode != 200) {
       throw Exception(_responseError(response, 'No se pudo actualizar el correo electrónico.'));
@@ -320,10 +320,14 @@ class VohkApi {
       throw Exception('Respuesta inválida al actualizar el correo electrónico.');
     }
     final updatedEmail = decoded['email']?.toString();
+    final updatedUsername = decoded['username']?.toString();
     if (updatedEmail == null || updatedEmail.isEmpty) {
       throw Exception('El servidor no devolvió el correo actualizado.');
     }
-    return updatedEmail;
+    if (updatedUsername == null || updatedUsername.isEmpty) {
+      throw Exception('El servidor no devolvió el nombre de usuario actualizado.');
+    }
+    return (email: updatedEmail, username: updatedUsername);
   }
 
   static Future<void> updatePassword({required String currentPassword, required String newPassword}) async {
