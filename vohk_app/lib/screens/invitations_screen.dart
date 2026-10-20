@@ -20,7 +20,7 @@ class InvitationsScreen extends StatefulWidget {
 
 class _InvitationsScreenState extends State<InvitationsScreen> {
   List<Map<String, dynamic>> _invitations = [];
-  List<Map<String, dynamic>> _intercoms = [];
+  List<Map<String, dynamic>> _accessDevices = [];
   List<Map<String, dynamic>> _units = [];
   Map<String, dynamic>? _selectedUnit;
   bool _loading = true;
@@ -71,7 +71,10 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
       final invitations = unitId == null ? <Map<String, dynamic>>[] : await VohkApi.getInvitations(unitId: unitId);
       if (!mounted) return;
       setState(() {
-        _intercoms = devices.where((device) => device['type'] == 'intercom').map((device) => Map<String, dynamic>.from(device as Map)).toList();
+        _accessDevices = devices
+            .where((device) => const {'intercom', 'lock'}.contains(device['type']?.toString()))
+            .map((device) => Map<String, dynamic>.from(device as Map))
+            .toList();
         _invitations = invitations.where(_isActiveInvitation).toList();
       });
     } catch (error) {
@@ -148,7 +151,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
     var vehiclePlate = '';
     File? photo;
     var biometricConsent = false;
-    final selectedDevices = _intercoms.map((device) => device['device_id'].toString()).toSet();
+    final selectedDevices = _accessDevices.map((device) => device['device_id'].toString()).toSet();
     final residents = (_selectedUnit?['residents'] as List<Map<String, dynamic>>?) ?? const [];
     String? residentUserId = _isResident || residents.isEmpty ? null : residents.first['user_id']?.toString();
     String? error;
@@ -158,13 +161,42 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
         builder: (context, setDialogState) {
           return AlertDialog(
             backgroundColor: VohkColors.surface,
-            title: const Text('Nueva invitación'),
+            insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+            titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+            contentPadding: const EdgeInsets.fromLTRB(24, 22, 24, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+              side: const BorderSide(color: VohkColors.border),
+            ),
+            title: const Row(
+              children: [
+                _DialogIcon(icon: Icons.person_add_alt_1_rounded),
+                SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Nueva invitación', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                      SizedBox(height: 3),
+                      Text(
+                        'Configura quién entra, cuándo y por dónde.',
+                        style: TextStyle(fontSize: 12, color: VohkColors.textSecondary, fontWeight: FontWeight.w400),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
             content: SizedBox(
               width: 480,
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    const _FormSectionLabel(icon: Icons.tune_rounded, label: 'TIPO DE INVITACIÓN'),
+                    const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
                       value: type,
                       decoration: const InputDecoration(labelText: 'Tipo'),
@@ -195,7 +227,9 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                       ),
                     ],
                     if (type != 'express') ...[
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 22),
+                      const _FormSectionLabel(icon: Icons.badge_outlined, label: 'DATOS DEL INVITADO'),
+                      const SizedBox(height: 10),
                       TextFormField(
                         decoration: const InputDecoration(labelText: 'Nombre *'),
                         onChanged: (value) => name = value,
@@ -283,27 +317,33 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                           },
                         ),
                     ],
+                    const SizedBox(height: 22),
+                    const _FormSectionLabel(icon: Icons.door_front_door_outlined, label: 'ACCESOS HABILITADOS'),
                     const SizedBox(height: 8),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text('Intercomunicadores', style: TextStyle(color: VohkColors.textSecondary, fontSize: 13)),
+                    const Text(
+                      'El PIN funcionará en todos los accesos seleccionados. FaceID solo se enviará a los intercomunicadores compatibles.',
+                      style: TextStyle(color: VohkColors.textSecondary, fontSize: 12, height: 1.35),
                     ),
-                    ..._intercoms.map((device) {
+                    const SizedBox(height: 10),
+                    ..._accessDevices.map((device) {
                       final id = device['device_id'].toString();
-                      return CheckboxListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        value: selectedDevices.contains(id),
-                        title: Text(device['name']?.toString() ?? 'Intercomunicador'),
-                        onChanged: (selected) {
-                          setDialogState(() {
-                            if (selected == true) {
-                              selectedDevices.add(id);
-                            } else {
-                              selectedDevices.remove(id);
-                            }
-                          });
-                        },
+                      final isLock = device['type']?.toString() == 'lock';
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _AccessDeviceTile(
+                          name: device['name']?.toString() ?? (isLock ? 'Cerradura' : 'Intercomunicador'),
+                          isLock: isLock,
+                          selected: selectedDevices.contains(id),
+                          onChanged: (selected) {
+                            setDialogState(() {
+                              if (selected) {
+                                selectedDevices.add(id);
+                              } else {
+                                selectedDevices.remove(id);
+                              }
+                            });
+                          },
+                        ),
                       );
                     }),
                     if (error != null) ...[
@@ -334,7 +374,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                   } else if (type == 'temporary' && (!end.isAfter(begin) || end.difference(begin) > Duration(hours: _maxTemporaryHours))) {
                     validationError = 'El pase temporal no puede superar ${_maxTemporaryHours ~/ 24} días.';
                   } else if (selectedDevices.isEmpty) {
-                    validationError = 'Selecciona al menos un intercomunicador.';
+                    validationError = 'Selecciona al menos un acceso.';
                   } else if (photo != null && !biometricConsent) {
                     validationError = 'Debes confirmar el consentimiento biométrico.';
                   }
@@ -624,6 +664,97 @@ class _DateRow extends StatelessWidget {
       subtitle: Text(value),
       trailing: const Icon(Icons.calendar_month),
       onTap: onTap,
+    );
+  }
+}
+
+class _DialogIcon extends StatelessWidget {
+  final IconData icon;
+
+  const _DialogIcon({required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(color: VohkColors.accentDim, borderRadius: BorderRadius.circular(14)),
+      child: Icon(icon, color: VohkColors.accentLight, size: 22),
+    );
+  }
+}
+
+class _FormSectionLabel extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _FormSectionLabel({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: VohkColors.accentLight),
+        const SizedBox(width: 7),
+        Text(
+          label,
+          style: const TextStyle(color: VohkColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.8),
+        ),
+      ],
+    );
+  }
+}
+
+class _AccessDeviceTile extends StatelessWidget {
+  final String name;
+  final bool isLock;
+  final bool selected;
+  final ValueChanged<bool> onChanged;
+
+  const _AccessDeviceTile({required this.name, required this.isLock, required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? VohkColors.accentDim.withValues(alpha: 0.55) : VohkColors.surfaceAlt,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => onChanged(!selected),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: selected ? VohkColors.accent.withValues(alpha: 0.65) : VohkColors.border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(color: selected ? VohkColors.accent.withValues(alpha: 0.16) : VohkColors.surface, borderRadius: BorderRadius.circular(11)),
+                child: Icon(
+                  isLock ? Icons.lock_outline_rounded : Icons.video_doorbell_outlined,
+                  color: selected ? VohkColors.accentLight : VohkColors.textSecondary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text(isLock ? 'TTLock · acceso solo con PIN' : 'Intercomunicador · PIN y FaceID', style: const TextStyle(color: VohkColors.textSecondary, fontSize: 11)),
+                  ],
+                ),
+              ),
+              Checkbox(value: selected, onChanged: (value) => onChanged(value == true)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

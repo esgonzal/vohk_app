@@ -65,8 +65,10 @@ class _LiveCameraViewState extends State<LiveCameraView> {
       await Future.delayed(const Duration(milliseconds: 500));
       if (_disposed) return;
       final localDesc = await peerConnection.getLocalDescription();
-      final whepUrl = '${widget.streamUrl}whep';
-      final request = await HttpClient().postUrl(Uri.parse(whepUrl));
+      final streamUri = Uri.parse(widget.streamUrl);
+      final basePath = streamUri.path.endsWith('/') ? streamUri.path : '${streamUri.path}/';
+      final whepUri = streamUri.replace(path: '${basePath}whep');
+      final request = await HttpClient().postUrl(whepUri);
       request.headers.set('Content-Type', 'application/sdp');
       request.add(utf8.encode(localDesc!.sdp!));
       final response = await request.close();
