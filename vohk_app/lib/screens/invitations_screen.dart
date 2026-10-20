@@ -734,7 +734,7 @@ class _AccessDeviceTile extends StatelessWidget {
                 height: 38,
                 decoration: BoxDecoration(color: selected ? VohkColors.accent.withValues(alpha: 0.16) : VohkColors.surface, borderRadius: BorderRadius.circular(11)),
                 child: Icon(
-                  isLock ? Icons.lock_outline_rounded : Icons.video_doorbell_outlined,
+                  isLock ? Icons.lock_outline_rounded : Icons.video_camera_front_outlined,
                   color: selected ? VohkColors.accentLight : VohkColors.textSecondary,
                   size: 20,
                 ),
