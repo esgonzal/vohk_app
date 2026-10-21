@@ -25,6 +25,7 @@ class _StaffConciergeScreenState extends State<StaffConciergeScreen> with Widget
   final Set<String> _openingDeviceIds = {};
   final Set<String> _recentlyOpenedDeviceIds = {};
   Timer? _activityTimer;
+  Timer? _mediaRefreshTimer;
   int _loadGeneration = 0;
   bool _loading = true;
   bool _placingCall = false;
@@ -54,12 +55,16 @@ class _StaffConciergeScreenState extends State<StaffConciergeScreen> with Widget
     _activityTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (_streamsActive) _loadActivities();
     });
+    _mediaRefreshTimer = Timer.periodic(const Duration(hours: 10), (_) {
+      if (_streamsActive) _refreshMediaUrls();
+    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final active = state == AppLifecycleState.resumed;
     if (active != _appActive && mounted) setState(() => _appActive = active);
+    if (active) unawaited(_refreshMediaUrls());
   }
 
   @override
@@ -76,6 +81,7 @@ class _StaffConciergeScreenState extends State<StaffConciergeScreen> with Widget
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _activityTimer?.cancel();
+    _mediaRefreshTimer?.cancel();
     _residentSearchController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -117,6 +123,17 @@ class _StaffConciergeScreenState extends State<StaffConciergeScreen> with Widget
       if (mounted) setState(() => _activities = activities);
     } catch (error) {
       debugPrint('Could not refresh concierge activities: $error');
+    }
+  }
+
+  Future<void> _refreshMediaUrls() async {
+    final condominiumId = _condominiumId;
+    if (condominiumId == null || condominiumId.isEmpty) return;
+    try {
+      final devices = await VohkApi.getDevices(condominiumId: condominiumId);
+      if (mounted && condominiumId == _condominiumId) setState(() => _devices = devices);
+    } catch (error) {
+      debugPrint('Could not renew concierge media URLs: $error');
     }
   }
 
