@@ -12,7 +12,10 @@ class CameraCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = '$snapshotUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+    final snapshotUri = Uri.tryParse(snapshotUrl);
+    final imageUrl = snapshotUri == null || snapshotUrl.isEmpty
+        ? snapshotUrl
+        : snapshotUri.replace(queryParameters: {...snapshotUri.queryParameters, 't': DateTime.now().millisecondsSinceEpoch.toString()}).toString();
 
     return AspectRatio(
       aspectRatio: aspectRatio,
