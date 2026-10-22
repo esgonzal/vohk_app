@@ -24,7 +24,6 @@ class _IntercomDetailScreenState extends State<IntercomDetailScreen> {
   void initState() {
     super.initState();
     final intercom = widget.intercom;
-    debugPrint('INTERCOM RAW => $intercom');
     streamUrl = intercom['stream_url'] ?? '';
     _talkService = IntercomTalkService();
     _talkService.state.addListener(_onTalkStateChanged);

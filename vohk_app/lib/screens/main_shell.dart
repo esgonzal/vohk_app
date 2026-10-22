@@ -937,15 +937,9 @@ class _MainShellState extends State<MainShell> {
                 )
               : content,
           floatingActionButton: _isResident && _currentLocation != null
-              ? FloatingActionButton(
-                  heroTag: 'resident-management-call',
-                  tooltip: 'Llamar a conserjería',
-                  onPressed: _placingManagementCall ? null : _callManagement,
-                  backgroundColor: const Color.fromARGB(255, 35, 139, 49),
-                  foregroundColor: Colors.black,
-                  child: _placingManagementCall
-                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                      : const Icon(Icons.phone_enabled),
+              ? Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _ResidentManagementCallButton(loading: _placingManagementCall, onPressed: _placingManagementCall ? null : _callManagement),
                 )
               : null,
           bottomNavigationBar: useNavigationRail
@@ -974,6 +968,63 @@ class _MainShellState extends State<MainShell> {
                 ),
         );
       },
+    );
+  }
+}
+
+class _ResidentManagementCallButton extends StatelessWidget {
+  final bool loading;
+  final VoidCallback? onPressed;
+
+  const _ResidentManagementCallButton({required this.loading, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      enabled: onPressed != null,
+      label: 'Llamar a conserjería',
+      child: Tooltip(
+        message: 'Llamar a conserjería',
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onPressed,
+            borderRadius: BorderRadius.circular(16),
+            child: Opacity(
+              opacity: onPressed == null ? 0.7 : 1,
+              child: SizedBox(
+                width: 104,
+                height: 82,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 56,
+                      height: 56,
+                      child: loading
+                          ? const DecoratedBox(
+                              decoration: BoxDecoration(color: Color(0xFF15803D), shape: BoxShape.circle),
+                              child: Padding(
+                                padding: EdgeInsets.all(17),
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              ),
+                            )
+                          : Image.asset('assets/images/conserjeria-verde.png', width: 56, height: 56, excludeFromSemantics: true),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Conserjería',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Color(0xFFE4EBE7), fontSize: 13, fontWeight: FontWeight.w500, height: 18 / 13),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

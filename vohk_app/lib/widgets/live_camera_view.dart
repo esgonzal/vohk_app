@@ -13,6 +13,8 @@ class LiveCameraView extends StatefulWidget {
 }
 
 class _LiveCameraViewState extends State<LiveCameraView> {
+  static const Duration _iceGatheringBudget = Duration(milliseconds: 1200);
+
   final RTCVideoRenderer _renderer = RTCVideoRenderer();
   RTCPeerConnection? _pc;
   Uri? _sessionUri;
@@ -110,7 +112,11 @@ class _LiveCameraViewState extends State<LiveCameraView> {
       if (_disposed || generation != _generation) return;
       await peerConnection.setLocalDescription(offer);
       if (peerConnection.iceGatheringState != RTCIceGatheringState.RTCIceGatheringStateComplete) {
-        await iceComplete.future.timeout(const Duration(seconds: 8), onTimeout: () {});
+        // Do not make the viewer wait for a slow or unreachable STUN server.
+        // Candidates gathered within this short budget are included in the
+        // WHEP offer; MediaMTX can start the stream without waiting eight
+        // seconds for ICE gathering to report completion.
+        await iceComplete.future.timeout(_iceGatheringBudget, onTimeout: () {});
       }
       if (_disposed || generation != _generation) return;
       final localDesc = await peerConnection.getLocalDescription();
