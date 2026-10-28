@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:vohk_app/screens/cameras_screen.dart';
 import 'package:vohk_app/screens/home_screen.dart';
 import 'package:vohk_app/screens/invitations_screen.dart';
@@ -317,46 +318,157 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
+  Future<void> _manageResidentQr(Map<String, dynamic> initialQr) async {
+    var qr = Map<String, dynamic>.from(initialQr);
+    var busy = false;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final code = qr['qrCode']?.toString();
+          final hasQr = qr['hasQr'] == true && code != null && code.isNotEmpty;
+          Future<void> renew() async {
+            setDialogState(() => busy = true);
+            try {
+              final updated = await VohkApi.renewResidentQr();
+              if (!dialogContext.mounted) return;
+              setDialogState(() {
+                qr = updated;
+                busy = false;
+              });
+            } catch (error) {
+              if (!dialogContext.mounted) return;
+              setDialogState(() => busy = false);
+              ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))));
+            }
+          }
+
+          Future<void> remove() async {
+            final confirmed = await showDialog<bool>(
+              context: dialogContext,
+              builder: (context) => AlertDialog(
+                title: const Text('Eliminar QR guardado'),
+                content: const Text(
+                  'Vöhk eliminará este QR de la aplicación. Una captura o copia anterior puede seguir funcionando hasta que termine su vigencia en el dispositivo.',
+                ),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+                  FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Eliminar')),
+                ],
+              ),
+            );
+            if (confirmed != true || !dialogContext.mounted) return;
+            setDialogState(() => busy = true);
+            try {
+              await VohkApi.deleteResidentQr();
+              if (!dialogContext.mounted) return;
+              setDialogState(() {
+                qr = {'hasQr': false};
+                busy = false;
+              });
+            } catch (error) {
+              if (!dialogContext.mounted) return;
+              setDialogState(() => busy = false);
+              ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))));
+            }
+          }
+
+          return AlertDialog(
+            title: Text(hasQr ? 'Mi código QR' : 'Acceso mediante QR'),
+            content: SizedBox(
+              width: 320,
+              child: SingleChildScrollView(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final qrSize = constraints.maxWidth.clamp(180.0, 240.0);
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (hasQr)
+                          QrImageView(data: code, size: qrSize, backgroundColor: Colors.white)
+                        else
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 28),
+                            child: Text('Todavía no tienes un QR de acceso.', textAlign: TextAlign.center),
+                          ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'El QR es adicional: tu código PIN continúa disponible. Al renovar, una copia anterior puede funcionar hasta que expire.',
+                          style: TextStyle(fontSize: 12, color: VohkColors.textSecondary),
+                          textAlign: TextAlign.center,
+                        ),
+                        if (busy) ...[const SizedBox(height: 16), const CircularProgressIndicator()],
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
+            actions: [
+              if (hasQr) TextButton(onPressed: busy ? null : remove, child: const Text('Eliminar')),
+              TextButton(onPressed: busy ? null : () => Navigator.pop(dialogContext), child: const Text('Cerrar')),
+              FilledButton(onPressed: busy ? null : renew, child: Text(hasQr ? 'Renovar' : 'Crear QR')),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _showAccessMethods() async {
     if (!_isResident) return;
     try {
-      final methods = await VohkApi.getAccessMethods();
+      final responses = await Future.wait([VohkApi.getAccessMethods(), VohkApi.getResidentQr()]);
+      final methods = responses[0];
+      final qr = responses[1];
       if (!mounted) return;
       showModalBottomSheet(
         context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
         backgroundColor: VohkColors.surface,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-        builder: (_) => Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(color: VohkColors.border, borderRadius: BorderRadius.circular(2)),
-              ),
-              const SizedBox(height: 24),
-              const Text('Métodos de acceso', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              _buildAccessTile(
-                icon: Icons.face,
-                title: 'Reconocimiento facial',
-                enabled: methods['hasFace'] == true,
-                subtitle: methods['hasFace'] == true ? 'Registrado en todos tus accesos' : 'Presiona para registrar o actualizar',
-                onTap: _updateResidentFace,
-                onDelete: _deleteResidentFace,
-              ),
-              _buildAccessTile(
-                icon: Icons.pin,
-                title: 'Código dinámico',
-                enabled: methods['hasDynamicCode'] == true,
-                subtitle: methods['dynamicCode']?.toString(),
-                onTap: _updateDynamicCode,
-              ),
-              _buildAccessTile(icon: Icons.credit_card, title: 'Tarjeta', enabled: methods['hasCard'] == true),
-              const SizedBox(height: 16),
-            ],
+        builder: (sheetContext) => ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.9),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: VohkColors.border, borderRadius: BorderRadius.circular(2)),
+                ),
+                const SizedBox(height: 24),
+                const Text('Métodos de acceso', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 20),
+                _buildAccessTile(
+                  icon: Icons.face,
+                  title: 'Reconocimiento facial',
+                  enabled: methods['hasFace'] == true,
+                  subtitle: methods['hasFace'] == true ? 'Registrado en todos tus accesos' : 'Presiona para registrar o actualizar',
+                  onTap: _updateResidentFace,
+                  onDelete: _deleteResidentFace,
+                ),
+                _buildAccessTile(
+                  icon: Icons.pin,
+                  title: 'Código dinámico',
+                  enabled: methods['hasDynamicCode'] == true,
+                  subtitle: methods['dynamicCode']?.toString(),
+                  onTap: _updateDynamicCode,
+                ),
+                _buildAccessTile(
+                  icon: Icons.qr_code_2,
+                  title: 'Código QR',
+                  enabled: qr['hasQr'] == true,
+                  subtitle: qr['hasQr'] == true ? 'Presiona para mostrar o renovar' : 'Presiona para crear',
+                  onTap: () => _manageResidentQr(qr),
+                ),
+                _buildAccessTile(icon: Icons.credit_card, title: 'Tarjeta', enabled: methods['hasCard'] == true),
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       );

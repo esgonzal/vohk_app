@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:vohk_app/widgets/responsive_content.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:vohk_app/services/auth_service.dart';
 import 'package:vohk_app/services/vohk_api.dart';
 import '../vohk_theme.dart';
@@ -434,7 +435,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
       );
       await _loadData();
       if (mounted) {
-        _showCodeDialog(response['dynamic_code']?.toString() ?? '');
+        _showCodeDialog(response['dynamic_code']?.toString() ?? '', qrCode: response['qr_code']?.toString());
       }
     } catch (error) {
       if (mounted) _showSnack(_errorMessage(error));
@@ -477,19 +478,39 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
     }
   }
 
-  void _showCodeDialog(String code) {
+  void _showCodeDialog(String code, {String? qrCode}) {
+    final hasQr = qrCode != null && qrCode.isNotEmpty;
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: VohkColors.surface,
         title: const Text('Invitación creada'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Código de acceso', style: TextStyle(color: VohkColors.textSecondary)),
-            const SizedBox(height: 12),
-            SelectableText(code, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, letterSpacing: 4)),
-          ],
+        content: SizedBox(
+          width: 320,
+          child: SingleChildScrollView(
+            child: LayoutBuilder(
+              builder: (context, constraints) => Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Código PIN', style: TextStyle(color: VohkColors.textSecondary)),
+                  const SizedBox(height: 12),
+                  SelectableText(code, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, letterSpacing: 4)),
+                  if (hasQr) ...[
+                    const SizedBox(height: 24),
+                    const Text('Código QR', style: TextStyle(color: VohkColors.textSecondary)),
+                    const SizedBox(height: 12),
+                    QrImageView(data: qrCode, size: constraints.maxWidth.clamp(180.0, 240.0), backgroundColor: Colors.white),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Funciona en los accesos QR seleccionados.',
+                      style: TextStyle(fontSize: 12, color: VohkColors.textSecondary),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
         ),
         actions: [
           TextButton(
@@ -502,7 +523,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
 
               _showSnack('Código copiado.');
             },
-            child: const Text('Copiar'),
+            child: const Text('Copiar PIN'),
           ),
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
         ],
@@ -606,6 +627,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
               else
                 ..._invitations.map((invitation) {
                   final code = invitation['dynamic_code']?.toString() ?? '';
+                  final qrCode = invitation['qr_code']?.toString();
 
                   final name = invitation['visitor_name']?.toString() ?? 'Pase Express';
 
@@ -616,7 +638,14 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       leading: CircleAvatar(
                         backgroundColor: Colors.green.withValues(alpha: .15),
-                        child: Icon(invitation['has_face'] == true ? Icons.face : Icons.pin_outlined, color: Colors.green),
+                        child: Icon(
+                          invitation['has_face'] == true
+                              ? Icons.face
+                              : invitation['has_qr'] == true
+                              ? Icons.qr_code_2
+                              : Icons.pin_outlined,
+                          color: Colors.green,
+                        ),
                       ),
                       title: Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
                       subtitle: Column(
@@ -629,9 +658,10 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                             style: const TextStyle(fontSize: 11, color: VohkColors.textSecondary),
                           ),
                           Text('PIN $code', style: const TextStyle(fontSize: 11, color: Colors.green)),
+                          if (invitation['has_qr'] == true) const Text('QR disponible', style: TextStyle(fontSize: 11, color: Colors.green)),
                         ],
                       ),
-                      onTap: code.isEmpty ? null : () => _showCodeDialog(code),
+                      onTap: code.isEmpty ? null : () => _showCodeDialog(code, qrCode: qrCode),
                       trailing: _canDelete(invitation)
                           ? IconButton(
                               icon: const Icon(Icons.delete_outline, color: VohkColors.error),

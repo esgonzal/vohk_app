@@ -349,6 +349,30 @@ class VohkApi {
     return jsonDecode(res.body);
   }
 
+  static Future<Map<String, dynamic>> getResidentQr() async {
+    final response = await http.get(Uri.parse('${ApiConfig.baseUrl}/devices/resident/qr-code'), headers: _headers());
+    if (response.statusCode != 200) {
+      throw Exception(_responseError(response, 'No se pudo obtener el código QR.'));
+    }
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
+  static Future<Map<String, dynamic>> renewResidentQr() async {
+    final response = await http.post(Uri.parse('${ApiConfig.baseUrl}/devices/resident/qr-code'), headers: _headers());
+    if (response.statusCode != 201) {
+      throw Exception(_responseError(response, 'No se pudo crear el código QR.'));
+    }
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
+  static Future<Map<String, dynamic>> deleteResidentQr() async {
+    final response = await http.delete(Uri.parse('${ApiConfig.baseUrl}/devices/resident/qr-code'), headers: _headers());
+    if (response.statusCode != 200) {
+      throw Exception(_responseError(response, 'No se pudo eliminar el código QR guardado.'));
+    }
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
   static Future<void> updateResidentFace(File photo) async {
     final request = http.MultipartRequest('PUT', Uri.parse('${ApiConfig.baseUrl}/devices/resident/face'));
     final token = AuthService.jwt;
